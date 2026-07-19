@@ -4,32 +4,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-struct bidirectional_hash_table_key_value_pair
-{
-    void* key;
-    void* value;
-};
-
-struct bidirectional_hash_table_collision_tree_node
-{
-    struct bidirectional_hash_table_key_value_pair* key_value_pair;
-    struct bidirectional_hash_table_collision_tree_node* left;
-    struct bidirectional_hash_table_collision_tree_node* right;
-    struct bidirectional_hash_table_collision_tree_node* parent;
-};
-
-struct bidirectional_hash_table
-{
-    struct bidirectional_hash_table_collision_tree_node** collision_trees_forward;
-    struct bidirectional_hash_table_collision_tree_node** collision_trees_backward;
-    size_t (*hash_function_key)(void*);
-    size_t (*hash_function_value)(void*);
-    int (*compare_function_key)(void*, void*);
-    int (*compare_function_value)(void*, void*);
-    size_t capacity;
-    size_t size;
-    float load_factor_threshold;
-};
+struct bidirectional_hash_table_key_value_pair;
+struct bidirectional_hash_table_collision_tree_node;
+struct bidirectional_hash_table;
 
 /******************************************************************
 Initializes a bidirectional hash table with the specified capacity.
@@ -50,9 +27,10 @@ void bidirectional_hash_table_destroy(struct bidirectional_hash_table* table);
 /************************************************************************************
 Inserts a key-value pair into the bidirectional hash table. If the key-value mapping  
 exists, does nothing. If either the key or the value is already present in the table, 
-it will be replaced with the new mapping.                                             
+it will be replaced with the new mapping. Returns true only if the hash table has
+changed. False otherwise.
 ************************************************************************************/
-void bidirectional_hash_table_insert(struct bidirectional_hash_table* table, void* key, void* value);
+bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, void* key, void* val);
 
 /*********************************************************************************
 Finds the value associated with the specified key in the bidirectional hash table.

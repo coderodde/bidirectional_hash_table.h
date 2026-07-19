@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="bidirectional_hash_table.c">
+    <ClCompile Include="bi_hash_table.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
