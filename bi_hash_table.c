@@ -293,6 +293,9 @@ static struct bidirectional_hash_table_collision_tree_node* rotate_right_left(st
     return left_rotate(node1);
 }
 
+/*****************************************************************************
+Balances the AVL tree after an insertion operation to maintain its properties.
+*****************************************************************************/
 static void fix_after_insertion(struct bidirectional_hash_table_collision_tree_node** root,
     struct bidirectional_hash_table_collision_tree_node* node) {
     struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
@@ -357,6 +360,9 @@ static void fix_after_insertion(struct bidirectional_hash_table_collision_tree_n
     }
 }
 
+/****************************************************************************
+Balances the AVL tree after an deletion operation to maintain its properties.
+****************************************************************************/
 static void fix_after_deletion(struct bidirectional_hash_table_collision_tree_node** root,
     struct bidirectional_hash_table_collision_tree_node* node) {
     struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
@@ -383,7 +389,7 @@ static void fix_after_deletion(struct bidirectional_hash_table_collision_tree_no
 
             if (grandparent != NULL) {
                 grandparent->height = MAX(get_height(grandparent->left),
-                    get_height(grandparent->right))) + 1;
+                                          get_height(grandparent->right))) + 1;
             }
         } else if (get_height(parent->right) == get_height(parent->left) + 2) {
             grandparent = parent->parent;
@@ -404,9 +410,113 @@ static void fix_after_deletion(struct bidirectional_hash_table_collision_tree_no
 
             if (grandparent != NULL) {
                 grandparent->height = MAX(get_height(grandparent->left),
-                    get_height(grandparent->right))) + 1;
+                                          get_height(grandparent->right))) + 1;
             }
         }
+    }
+}
+
+/********************************************************************************
+Inserts a key-value pair into the collision tree of the bidirectional hash table.
+********************************************************************************/
+static void insert_into_collision_tree(struct bidirectional_hash_table_collision_tree_node** root,
+                                       struct bidirectional_hash_table_key_value_pair* kv_pair) {
+
+    struct bidirectional_hash_table_collision_tree_node* new_node = create_collision_tree_node(kv_pair);
+
+    if (*root == NULL) {
+        *root = new_node;
+        return;
+    }
+
+    struct bidirectional_hash_table_collision_tree_node* current = *root;
+    struct bidirectional_hash_table_collision_tree_node* parent  = NULL;
+
+    while (current != NULL) {
+        parent = current;
+
+        if (kv_pair->key < current->key_value_pair->key) {
+            current = current->left;
+        } else {
+            current = current->right;
+        }
+    }
+
+    new_node->parent = parent;
+
+    if (kv_pair->key < parent->key_value_pair->key) {
+        parent->left = new_node;
+    } else {
+        parent->right = new_node;
+    }
+
+    fix_after_insertion(root, new_node);
+}
+
+static struct bidirectional_hash_table_collision_tree_node* find_minimum(struct bidirectional_hash_table_collision_tree_node* node) {
+    while (node->left != NULL) {
+        node = node->left;
+    }
+
+    return node;
+}
+
+static struct bidirectional_hash_table_collision_tree_node* find_successor(struct bidirectional_hash_table_collision_tree_node* node) {
+    if (node->right != NULL) {
+        return find_minimum(node->right);
+    }
+
+    struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
+    
+    while (parent != NULL && node == parent->right) {
+        node = parent;
+        parent = parent->parent;
+    }
+
+    return parent;
+}
+
+/*************************************************************************************
+Deletes a collision tree node from the collision tree of the bidirectional hash table.
+*************************************************************************************/
+static void delete_from_collision_tree(struct bidirectional_hash_table_collision_tree_node** root,
+                                       struct bidirectional_hash_table_collision_tree_node* node) {
+    if (node == NULL) {
+        return; // TODO: Remove?
+    }
+
+    struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
+    
+    if (node->left == NULL && node->right == NULL) {
+        if (parent == NULL) {
+            *root = NULL;
+        } else if (parent->left == node) {
+            parent->left = NULL;
+        } else {
+            parent->right = NULL;
+        }
+    } else if (node->left != NULL && node->right != NULL) {
+        struct bidirectional_hash_table_collision_tree_node* successor = find_successor(node);
+
+        // Swap the key-value pairs of the node and its successor:
+        struct bidirectional_hash_table_key_value_pair* temp_kv_pair = node->key_value_pair;
+        node->key_value_pair      = successor->key_value_pair;
+        successor->key_value_pair = temp_kv_pair;
+
+        // Recursively delete the successor
+        delete_from_collision_tree(root, successor);
+    } else {
+        struct bidirectional_hash_table_collision_tree_node* child = (node->left != NULL) ? node->left : node->right;
+
+        if (parent == NULL) {
+            *root = child;
+        } else if (parent->left == node) {
+            parent->left = child;
+        } else {
+            parent->right = child;
+        }
+
+        child->parent = parent;
     }
 }
 
@@ -441,8 +551,8 @@ bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, voi
     const size_t key_index = table->hash_function_key(key) % table->capacity;
     const size_t val_index = table->hash_function_val(val) % table->capacity;
 
-    struct bidirectional_hash_table_collision_tree_node* existing_key_node = get_node_by_key(table->collision_trees_forward [key_index], key);
-    struct bidirectional_hash_table_collision_tree_node* existing_val_node = get_node_by_val(table->collision_trees_backward[val_index], val);
+    struct bidirectional_hash_table_collision_tree_node* existing_key_node = get_node_by_key(table, table->collision_trees_forward [key_index], key);
+    struct bidirectional_hash_table_collision_tree_node* existing_val_node = get_node_by_val(table, table->collision_trees_backward[val_index], val);
 
     if (existing_key_node != NULL && existing_val_node != NULL) {
         if (existing_key_node->key_value_pair == existing_val_node->key_value_pair) {
@@ -471,29 +581,125 @@ bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, voi
 /*********************************************************************************
 Finds the value associated with the specified key in the bidirectional hash table.
 *********************************************************************************/
-void* bidirectional_hash_table_find_by_key(struct bidirectional_hash_table* table, void* key);
+void* bidirectional_hash_table_find_by_key(struct bidirectional_hash_table* table, void* key) {
+    if (table == NULL || key == NULL) {
+        return NULL;
+    }
+
+    const size_t key_index = table->hash_function_key(key) % table->capacity;
+
+    struct bidirectional_hash_table_collision_tree_node* node = get_node_by_key(table, table->collision_trees_forward[key_index], key);
+    
+    if (node != NULL) {
+        return node->key_value_pair->val;
+    }
+   
+    return NULL;
+}
 
 /*********************************************************************************
 Finds the key associated with the specified value in the bidirectional hash table.
 *********************************************************************************/
-void* bidirectional_hash_table_find_by_value(struct bidirectional_hash_table* table, void* value);
+void* bidirectional_hash_table_find_by_value(struct bidirectional_hash_table* table, void* value) {
+    if (table == NULL || value == NULL) {
+        return NULL;
+    }
+    const size_t val_index = table->hash_function_val(value) % table->capacity;
+
+    struct bidirectional_hash_table_collision_tree_node* node = get_node_by_val(table, table->collision_trees_backward[val_index], value);
+    
+    if (node != NULL) {
+        return node->key_value_pair->key;
+    }
+   
+    return NULL;
+}
 
 /**********************************************************************************************
 Removes the key-value pair associated with the specified key from the bidirectional hash table.
 **********************************************************************************************/
-bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* table, void* key);
+bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* table, void* key) {
+    if (table == NULL || key == NULL) {
+        return false;
+    }
+
+    const size_t key_index = table->hash_function_key(key) % table->capacity;
+    struct bidirectional_hash_table_collision_tree_node* node = get_node_by_key(table, table->collision_trees_forward[key_index], key);
+    
+    if (node == NULL) {
+        return false;
+    }
+
+    void* value = node->key_value_pair->val;
+    const size_t val_index = table->hash_function_val(value) % table->capacity;
+
+    // Remove the node from both collision trees
+    delete_from_collision_tree(&table->collision_trees_forward [key_index], node);
+    delete_from_collision_tree(&table->collision_trees_backward[val_index], node);
+
+    // Free the key-value pair
+    free(node->key_value_pair);
+    free(node);
+
+    table->size--;
+    return true;
+}
 
 /************************************************************************************************
 Removes the key-value pair associated with the specified value from the bidirectional hash table.
 ************************************************************************************************/
-bool bidirectional_hash_table_remove_by_value(struct bidirectional_hash_table* table, void* value);
+bool bidirectional_hash_table_remove_by_value(struct bidirectional_hash_table* table, void* value) {
+    if (table == NULL || value == NULL) {
+        return false;
+    }
+
+    const size_t val_index = table->hash_function_val(value) % table->capacity;
+    struct bidirectional_hash_table_collision_tree_node* node = get_node_by_val(table, table->collision_trees_backward[val_index], value);
+    
+    if (node == NULL) {
+        return false;
+    }
+
+    void* key = node->key_value_pair->key;
+    const size_t key_index = table->hash_function_key(key) % table->capacity;
+
+    // Remove the node from both collision trees
+    delete_from_collision_tree(&table->collision_trees_forward [key_index], node);
+    delete_from_collision_tree(&table->collision_trees_backward[val_index], node);
+
+    // Free the key-value pair
+    free(node->key_value_pair);
+    free(node);
+
+    table->size--;
+    return true;
+}
 
 /****************************************************************************************
 Returns true if the bidirectional hash table contains the specified key, false otherwise.
 ****************************************************************************************/
-bool bidirectional_hash_table_contains_key(struct bidirectional_hash_table* table, void* key);
+bool bidirectional_hash_table_contains_key(struct bidirectional_hash_table* table, void* key) {
+    if (table == NULL || key == NULL) {
+        return false;
+    }
+
+    const size_t key_index = table->hash_function_key(key) % table->capacity;
+    struct bidirectional_hash_table_collision_tree_node* node = get_node_by_key(table, table->collision_trees_forward[key_index], key);
+    
+    return node != NULL;
+
+}
 
 /******************************************************************************************
 Returns true if the bidirectional hash table contains the specified value, false otherwise.
 ******************************************************************************************/
-bool bidirectional_hash_table_contains_value(struct bidirectional_hash_table* table, void* value);
+bool bidirectional_hash_table_contains_value(struct bidirectional_hash_table* table, void* value) {
+    if (table == NULL || value == NULL) {
+        return false;
+    }
+
+    const size_t val_index = table->hash_function_val(value) % table->capacity;
+    struct bidirectional_hash_table_collision_tree_node* node = get_node_by_val(table, table->collision_trees_backward[val_index], value);
+    
+    return node != NULL;
+}
