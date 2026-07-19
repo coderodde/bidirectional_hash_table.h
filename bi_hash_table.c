@@ -233,6 +233,9 @@ static struct bidirectional_hash_table_collision_tree_node* get_node_by_val(stru
     return NULL;
 }
 
+/*********************************************************************************
+Rotates a tree rooted at 'node1' to the left and returns the new root of the tree.
+*********************************************************************************/
 static struct bidirectional_hash_table_collision_tree_node* 
 rotate_left(struct bidirectional_hash_table_collision_tree_node* node1) {
 
@@ -253,6 +256,9 @@ rotate_left(struct bidirectional_hash_table_collision_tree_node* node1) {
     return node2;
 }
 
+/**********************************************************************************
+Rotates a tree rooted at 'node1' to the right and returns the new root of the tree.
+**********************************************************************************/
 static struct bidirectional_hash_table_collision_tree_node*
 rotate_right(struct bidirectional_hash_table_collision_tree_node* node1) {
 
@@ -287,24 +293,120 @@ static struct bidirectional_hash_table_collision_tree_node* rotate_right_left(st
     return left_rotate(node1);
 }
 
-static void fix_after_insertion(struct bidirectional_hash_table_collision_tree_node** root, 
-                                 struct bidirectional_hash_table_collision_tree_node* node) {
-    while (node != NULL) {
-        int balance_factor = get_balance_factor(node);
-        if (balance_factor > 1) {
-            if (get_balance_factor(node->left) < 0) {
-                rotate_left_right(root, node);
-            } else {
-                rotate_right(root, node);
+static void fix_after_insertion(struct bidirectional_hash_table_collision_tree_node** root,
+    struct bidirectional_hash_table_collision_tree_node* node) {
+    struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
+    struct bidirectional_hash_table_collision_tree_node* grandparent = parent ? parent->parent : NULL;
+    struct bidirectional_hash_table_collision_tree_node* sub_tree;
+
+    while (parent != NULL) {
+        if (get_height(parent->left) == get_height(parent->right) + 2) {
+            grandparent = parent->parent;
+
+            if (get_height(parent->left->left) >= get_height(parent->left->right)) {
+                sub_tree = rotate_right(parent);
             }
-        } else if (balance_factor < -1) {
-            if (get_balance_factor(node->right) > 0) {
-                rotate_right_left(root, node);
+            else {
+                sub_tree = rotate_left_right(parent);
+            }
+
+            if (grandparent == NULL) {
+                *root = sub_tree;
+            }
+            else if (grandparent->left == parent) {
+                grandparent->left = sub_tree;
+            }
+            else {
+                grandparent->right = sub_tree;
+            }
+
+            if (grandparent != NULL) {
+                grandparent->height = MAX(get_height(grandparent->left),
+                    get_height(grandparent->right))) + 1;
+            }
+
+            return;
+        }
+        else if (get_height(parent->right) == get_height(parent->left) + 2) {
+            grandparent = parent->parent;
+
+            if (get_height(parent->right->right) >= get_height(parent->right->left)) {
+                sub_tree = rotate_left(parent);
+            }
+            else {
+                sub_tree = rotate_right_left(parent);
+            }
+
+            if (grandparent == NULL) {
+                *root = sub_tree;
+            }
+            else if (grandparent->left == parent) {
+                grandparent->left = sub_tree;
+            }
+            else {
+                grandparent->right = sub_tree;
+            }
+
+            if (grandparent != NULL) {
+                grandparent->height = MAX(get_height(grandparent->left),
+                    get_height(grandparent->right))) + 1;
+            }
+
+            return;
+        }
+    }
+}
+
+static void fix_after_deletion(struct bidirectional_hash_table_collision_tree_node** root,
+    struct bidirectional_hash_table_collision_tree_node* node) {
+    struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
+    struct bidirectional_hash_table_collision_tree_node* grandparent = parent ? parent->parent : NULL;
+    struct bidirectional_hash_table_collision_tree_node* sub_tree;
+
+    while (parent != NULL) {
+        if (get_height(parent->left) == get_height(parent->right) + 2) {
+            grandparent = parent->parent;
+
+            if (get_height(parent->left->left) >= get_height(parent->left->right)) {
+                sub_tree = rotate_right(parent);
             } else {
-                rotate_left(root, node);
+                sub_tree = rotate_left_right(parent);
+            }
+
+            if (grandparent == NULL) {
+                *root = sub_tree;
+            } else if (grandparent->left == parent) {
+                grandparent->left = sub_tree;
+            } else {
+                grandparent->right = sub_tree;
+            }
+
+            if (grandparent != NULL) {
+                grandparent->height = MAX(get_height(grandparent->left),
+                    get_height(grandparent->right))) + 1;
+            }
+        } else if (get_height(parent->right) == get_height(parent->left) + 2) {
+            grandparent = parent->parent;
+
+            if (get_height(parent->right->right) >= get_height(parent->right->left)) {
+                sub_tree = rotate_left(parent);
+            } else {
+                sub_tree = rotate_right_left(parent);
+            }
+
+            if (grandparent == NULL) {
+                *root = sub_tree;
+            } else if (grandparent->left == parent) {
+                grandparent->left = sub_tree;
+            } else {
+                grandparent->right = sub_tree;
+            }
+
+            if (grandparent != NULL) {
+                grandparent->height = MAX(get_height(grandparent->left),
+                    get_height(grandparent->right))) + 1;
             }
         }
-        node = node->parent;
     }
 }
 
