@@ -2,17 +2,31 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b)
 
-static void* not_null(void* ptr) {
+static void* not_null_impl(void* ptr, const char* file, int line, const char* func) {
     if (ptr == NULL) {
+        fprintf(stderr,
+            "%s:%d: %s: NULL pointer\n",
+            file,
+            line,
+            func);
+
         abort();
     }
 
     return ptr;
 }
+
+#ifdef NDEBUG
+#define NOT_NULL(ptr)
+#else
+#define NOT_NULL(ptr) not_null_impl(ptr, __FILE__, __LINE__, __func__)
+#endif
 
 struct bidirectional_hash_table_key_value_pair
 {
@@ -42,6 +56,12 @@ struct bidirectional_hash_table
     int (*compare_function_val)(void*);
 };
 
+struct bidirectional_hash_table_key_value_pair_iterator {
+    struct bidirectional_hash_table* table;
+    size_t table_socket_index;
+    struct bidirectional_hash_table_collision_tree_node* current_tree_node;
+};
+
 static struct bidirectional_hash_table_collision_tree_node* create_collision_tree_node(struct bidirectional_hash_table_key_value_pair* kv_pair) {
     struct bidirectional_hash_table_collision_tree_node* node = not_null(malloc(sizeof(struct bidirectional_hash_table_collision_tree_node)));
 
@@ -54,12 +74,8 @@ static struct bidirectional_hash_table_collision_tree_node* create_collision_tre
     return node;
 }
 
-static int get_height(struct bidirectional_hash_table_collision_tree_node* node) {
-    if (node == NULL) {
-        return -1;
-    }
-
-    return node->height;
+static int height(struct bidirectional_hash_table_collision_tree_node* node) {
+    return node == NULL ? -1 : node->height;
 }
 
 static float MIN_LOAD_FACTOR_THRESHOLD = 0.1f;
@@ -250,8 +266,8 @@ rotate_left(struct bidirectional_hash_table_collision_tree_node* node1) {
         node1->right->parent = node1;
     }
 
-    node1->height = MAX(get_height(node1->left), get_height(node1->right))) + 1;
-    node2->height = MAX(get_height(node2->left), get_height(node2->right))) + 1;
+    node1->height = MAX(height(node1->left), height(node1->right))) + 1;
+    node2->height = MAX(height(node2->left), height(node2->right))) + 1;
 
     return node2;
 }
@@ -273,86 +289,81 @@ rotate_right(struct bidirectional_hash_table_collision_tree_node* node1) {
         node1->left->parent = node1;
     }   
 
-    node1->height = MAX(get_height(node1->left), get_height(node1->right))) + 1;    
-    node2->height = MAX(get_height(node2->left), get_height(node2->right))) + 1;
+    node1->height = MAX(height(node1->left), height(node1->right))) + 1;    
+    node2->height = MAX(height(node2->left), height(node2->right))) + 1;
 
     return node2;
-}
-
-static struct bidirectional_hash_table_collision_tree_node* rotate_left_right(struct bidirectional_hash_table_collision_tree_node* node1) {
-    struct bidirectional_hash_table_collision_tree_node* node2 = node1->left;
-
-    node1->right = rotate_left(node2);   
-    return right_rotate(node1);
 }
 
 static struct bidirectional_hash_table_collision_tree_node* rotate_right_left(struct bidirectional_hash_table_collision_tree_node* node1) {
     struct bidirectional_hash_tree_collision_tree_node* node2 = node1->right;
 
-    node1->left = rotate_right(node2);   
+    node1->right = rotate_right(node2);
     return left_rotate(node1);
+}
+
+static struct bidirectional_hash_table_collision_tree_node* rotate_left_right(struct bidirectional_hash_table_collision_tree_node* node1) {
+    struct bidirectional_hash_table_collision_tree_node* node2 = node1->left;
+
+    node1->left = rotate_left(node2);   
+    return right_rotate(node1);
 }
 
 /*****************************************************************************
 Balances the AVL tree after an insertion operation to maintain its properties.
 *****************************************************************************/
-static void fix_after_insertion(struct bidirectional_hash_table_collision_tree_node** root,
+static void fix_after_insertion(
+    struct bidirectional_hash_table_collision_tree_node** root,
     struct bidirectional_hash_table_collision_tree_node* node) {
+
     struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
-    struct bidirectional_hash_table_collision_tree_node* grandparent = parent ? parent->parent : NULL;
+    struct bidirectional_hash_table_collision_tree_node* grandparent;
     struct bidirectional_hash_table_collision_tree_node* sub_tree;
 
     while (parent != NULL) {
-        if (get_height(parent->left) == get_height(parent->right) + 2) {
+        if (height(parent->left) == height(parent->right) + 2) {
             grandparent = parent->parent;
 
-            if (get_height(parent->left->left) >= get_height(parent->left->right)) {
+            if (height(parent->left->left) >= height(parent->left->right)) {
                 sub_tree = rotate_right(parent);
-            }
-            else {
+            } else {
                 sub_tree = rotate_left_right(parent);
             }
 
             if (grandparent == NULL) {
                 *root = sub_tree;
-            }
-            else if (grandparent->left == parent) {
+            } else if (grandparent->left == parent) {
                 grandparent->left = sub_tree;
-            }
-            else {
+            } else {
                 grandparent->right = sub_tree;
             }
 
             if (grandparent != NULL) {
-                grandparent->height = MAX(get_height(grandparent->left),
-                    get_height(grandparent->right))) + 1;
+                grandparent->height = MAX(height(grandparent->left),
+                                          height(grandparent->right))) + 1;
             }
 
             return;
-        }
-        else if (get_height(parent->right) == get_height(parent->left) + 2) {
+        } else if (height(parent->right) == height(parent->left) + 2) {
             grandparent = parent->parent;
 
-            if (get_height(parent->right->right) >= get_height(parent->right->left)) {
+            if (height(parent->right->right) >= height(parent->right->left)) {
                 sub_tree = rotate_left(parent);
-            }
-            else {
+            } else {
                 sub_tree = rotate_right_left(parent);
             }
 
             if (grandparent == NULL) {
                 *root = sub_tree;
-            }
-            else if (grandparent->left == parent) {
+            } else if (grandparent->left == parent) {
                 grandparent->left = sub_tree;
-            }
-            else {
+            } else {
                 grandparent->right = sub_tree;
             }
 
             if (grandparent != NULL) {
-                grandparent->height = MAX(get_height(grandparent->left),
-                    get_height(grandparent->right))) + 1;
+                grandparent->height = MAX(height(grandparent->left),
+                                          height(grandparent->right))) + 1;
             }
 
             return;
@@ -364,16 +375,18 @@ static void fix_after_insertion(struct bidirectional_hash_table_collision_tree_n
 Balances the AVL tree after an deletion operation to maintain its properties.
 ****************************************************************************/
 static void fix_after_deletion(struct bidirectional_hash_table_collision_tree_node** root,
+    struct bidirectional_hash_table_collision_tree_node** root,
     struct bidirectional_hash_table_collision_tree_node* node) {
+
     struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
-    struct bidirectional_hash_table_collision_tree_node* grandparent = parent ? parent->parent : NULL;
+    struct bidirectional_hash_table_collision_tree_node* grandparent;
     struct bidirectional_hash_table_collision_tree_node* sub_tree;
 
     while (parent != NULL) {
-        if (get_height(parent->left) == get_height(parent->right) + 2) {
+        if (height(parent->left) == height(parent->right) + 2) {
             grandparent = parent->parent;
 
-            if (get_height(parent->left->left) >= get_height(parent->left->right)) {
+            if (height(parent->left->left) >= height(parent->left->right)) {
                 sub_tree = rotate_right(parent);
             } else {
                 sub_tree = rotate_left_right(parent);
@@ -388,13 +401,13 @@ static void fix_after_deletion(struct bidirectional_hash_table_collision_tree_no
             }
 
             if (grandparent != NULL) {
-                grandparent->height = MAX(get_height(grandparent->left),
-                                          get_height(grandparent->right))) + 1;
+                grandparent->height = MAX(height(grandparent->left),
+                    height(grandparent->right))) + 1;
             }
-        } else if (get_height(parent->right) == get_height(parent->left) + 2) {
+        } else if (height(parent->right) == height(parent->left) + 2) {
             grandparent = parent->parent;
 
-            if (get_height(parent->right->right) >= get_height(parent->right->left)) {
+            if (height(parent->right->right) >= height(parent->right->left)) {
                 sub_tree = rotate_left(parent);
             } else {
                 sub_tree = rotate_right_left(parent);
@@ -409,8 +422,8 @@ static void fix_after_deletion(struct bidirectional_hash_table_collision_tree_no
             }
 
             if (grandparent != NULL) {
-                grandparent->height = MAX(get_height(grandparent->left),
-                                          get_height(grandparent->right))) + 1;
+                grandparent->height = MAX(height(grandparent->left),
+                    height(grandparent->right))) + 1;
             }
         }
     }
@@ -702,4 +715,82 @@ bool bidirectional_hash_table_contains_value(struct bidirectional_hash_table* ta
     struct bidirectional_hash_table_collision_tree_node* node = get_node_by_val(table, table->collision_trees_backward[val_index], value);
     
     return node != NULL;
+}
+
+static size_t find_table_socket_index_starting_from(struct bidirectional_hash_table* table, size_t start_index) {
+    for (size_t i = start_index; i != table->capacity; ++i) {
+        if (table->collision_trees_forward[i] != NULL) {
+            return i;
+        }
+    }
+
+    return SIZE_MAX;
+}
+
+static size_t find_first_table_socket_index(struct bidirectional_hash_table* table) {
+    return find_table_socket_index_starting_from(table, 0);
+}
+
+/*********************************************************
+Creates an iterator over the hash table's key/value pairs.
+*********************************************************/
+struct bidirectional_hash_table_key_value_pair_iterator* bidirectional_hash_table_create_iterator(struct bidirectional_hash_table* table) {
+
+    struct bidirectional_hash_table_key_value_pair_iterator* it = NOT_NULL(malloc(sizeof *it));
+
+    it->table              = table;
+    it->table_socket_index = find_first_table_socket_index(table);
+    it->current_tree_node  = find_minimum(table->collision_trees_forward[it->table_socket_index]);
+
+    return it;
+}
+
+/*********************************************
+Returns true only if there is more to iterate.
+*********************************************/
+bool bidirectional_hash_table_iterator_has_next(struct bidirectional_hash_table_key_value_pair_iterator* iterator) {
+    return iterator->table_socket_index < SIZE_MAX;
+}
+
+/**********************************************************************************
+Loads the current key/value pair and advances the iteration pointer one pair ahead.
+**********************************************************************************/
+int bidirectional_hash_table_iterator_next(struct bidirectional_hash_table_key_value_pair_iterator* iterator, void** pkey, void** pval) {
+    if (!bidirectional_hash_table_iterator_has_next(iterator)) {
+        return -1;
+    }
+
+    struct bidirectional_hash_table_collision_tree_node* node = iterator->current_tree_node;
+
+    *pkey = node->key_value_pair->key;
+    *pval = node->key_value_pair->val;
+
+    node = find_successor(node);
+
+    if (node == NULL) {
+        size_t socket_index = find_table_socket_index_starting_from(iterator->table, 
+                                                                    iterator->table_socket_index + 1);
+
+        iterator->table_socket_index = socket_index;
+        iterator->current_tree_node  = find_minimum(iterator->table->collision_trees_forward[socket_index]);
+    }
+}
+
+/*****************************************************
+Removes the most recent key/value pair from the table.
+*****************************************************/
+int bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_key_value_pair_iterator* iterator) {
+    if (!bidirectional_hash_table_iterator_has_next(iterator)) {
+        return -1;
+    }
+
+    struct bidirectional_hash_table_collision_tree_node* node = iterator->current_tree_node;
+
+    // Remove the node from the collision tree
+    remove_node_from_collision_tree(iterator->table->collision_trees_forward[iterator->table_socket_index], node);
+
+    // Update the iterator's current tree node
+    iterator->current_tree_node = find_successor(node);
+
+    return 0;
 }
