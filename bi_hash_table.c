@@ -23,7 +23,7 @@ static void* not_null_impl(void* ptr, const char* file, int line, const char* fu
 }
 
 #ifdef NDEBUG
-#define NOT_NULL(ptr)
+#define NOT_NULL(ptr) (ptr)
 #else
 #define NOT_NULL(ptr) not_null_impl(ptr, __FILE__, __LINE__, __func__)
 #endif
@@ -106,12 +106,12 @@ bidirectional_hash_table_init(size_t capacity,
     NOT_NULL(table);
 
     if (capacity == 0) {
-        return;
+        return NULL;
     }
 
     // TOOD: from calloc to malloc?
-    table->collision_trees_forward  = not_null(calloc(capacity, sizeof(struct bidirectional_hash_table_collision_tree_node*)));
-    table->collision_trees_backward = not_null(calloc(capacity, sizeof(struct bidirectional_hash_table_collision_tree_node*)));
+    table->collision_trees_forward  = NOT_NULL(calloc(capacity, sizeof(struct bidirectional_hash_table_collision_tree_node*)));
+    table->collision_trees_backward = NOT_NULL(calloc(capacity, sizeof(struct bidirectional_hash_table_collision_tree_node*)));
     table->load_factor_threshold    = fix_load_factor(load_factor_threshold);
     table->hash_function_key        = hash_function_key;
     table->hash_function_val        = hash_function_val;
@@ -259,7 +259,7 @@ static struct bidirectional_hash_table_collision_tree_node* get_node_by_val(stru
 Rotates a tree rooted at 'node1' to the left and returns the new root of the tree.
 *********************************************************************************/
 static struct bidirectional_hash_table_collision_tree_node* 
-rotate_left(struct bidirectional_hash_table_collision_tree_node* node1) {
+tree_rotate_left(struct bidirectional_hash_table_collision_tree_node* node1) {
 
     struct bidirectional_hash_table_collision_tree_node* node2 = node1->right;
 
@@ -282,7 +282,7 @@ rotate_left(struct bidirectional_hash_table_collision_tree_node* node1) {
 Rotates a tree rooted at 'node1' to the right and returns the new root of the tree.
 **********************************************************************************/
 static struct bidirectional_hash_table_collision_tree_node*
-rotate_right(struct bidirectional_hash_table_collision_tree_node* node1) {
+tree_rotate_right(struct bidirectional_hash_table_collision_tree_node* node1) {
 
     struct bidirectional_hash_table_collision_tree_node* node2 = node1->left;
 
@@ -301,18 +301,18 @@ rotate_right(struct bidirectional_hash_table_collision_tree_node* node1) {
     return node2;
 }
 
-static struct bidirectional_hash_table_collision_tree_node* rotate_right_left(struct bidirectional_hash_table_collision_tree_node* node1) {
+static struct bidirectional_hash_table_collision_tree_node* tree_rotate_right_left(struct bidirectional_hash_table_collision_tree_node* node1) {
     struct bidirectional_hash_tree_collision_tree_node* node2 = node1->right;
 
-    node1->right = rotate_right(node2);
-    return left_rotate(node1);
+    node1->right = tree_rotate_right(node2);
+    return tree_left_rotate(node1);
 }
 
-static struct bidirectional_hash_table_collision_tree_node* rotate_left_right(struct bidirectional_hash_table_collision_tree_node* node1) {
+static struct bidirectional_hash_table_collision_tree_node* tree_rotate_left_right(struct bidirectional_hash_table_collision_tree_node* node1) {
     struct bidirectional_hash_table_collision_tree_node* node2 = node1->left;
 
-    node1->left = rotate_left(node2);   
-    return right_rotate(node1);
+    node1->left = tree_rotate_left(node2);   
+    return tree_right_rotate(node1);
 }
 
 /*****************************************************************************
@@ -331,9 +331,9 @@ static void fix_after_insertion(
             grandparent = parent->parent;
 
             if (height(parent->left->left) >= height(parent->left->right)) {
-                sub_tree = rotate_right(parent);
+                sub_tree = tree_rotate_right(parent);
             } else {
-                sub_tree = rotate_left_right(parent);
+                sub_tree = tree_rotate_left_right(parent);
             }
 
             if (grandparent == NULL) {
@@ -354,9 +354,9 @@ static void fix_after_insertion(
             grandparent = parent->parent;
 
             if (height(parent->right->right) >= height(parent->right->left)) {
-                sub_tree = rotate_left(parent);
+                sub_tree = tree_rotate_left(parent);
             } else {
-                sub_tree = rotate_right_left(parent);
+                sub_tree = tree_rotate_right_left(parent);
             }
 
             if (grandparent == NULL) {
@@ -393,9 +393,9 @@ static void fix_after_deletion(
             grandparent = parent->parent;
 
             if (height(parent->left->left) >= height(parent->left->right)) {
-                sub_tree = rotate_right(parent);
+                sub_tree = tree_rotate_right(parent);
             } else {
-                sub_tree = rotate_left_right(parent);
+                sub_tree = tree_rotate_left_right(parent);
             }
 
             if (grandparent == NULL) {
@@ -414,9 +414,9 @@ static void fix_after_deletion(
             grandparent = parent->parent;
 
             if (height(parent->right->right) >= height(parent->right->left)) {
-                sub_tree = rotate_left(parent);
+                sub_tree = tree_rotate_left(parent);
             } else {
-                sub_tree = rotate_right_left(parent);
+                sub_tree = tree_rotate_right_left(parent);
             }
 
             if (grandparent == NULL) {

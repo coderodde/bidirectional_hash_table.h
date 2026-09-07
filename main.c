@@ -50,13 +50,11 @@ uint64_t int_array_list_hash(void* ptr) {
 int int_array_lists_compare(void* a, void* b) {
     struct int_array_list* list_a = a;
     struct int_array_list* list_b = b;
-    int cmp = (int)list_a->size - (int)list_b->size;
+    int cmp = (int) list_a->size - (int) list_b->size;
 
     if (cmp != 0) {
         return cmp;
     }
-
-    size_t sz = int_array_list_size(a);
 
     for (size_t i = 0; i < int_array_list_size(a); ++i) {
         int ia = int_array_list_get(a, i);
@@ -112,4 +110,8 @@ int main() {
         str_cmp);
 
     bidirectional_hash_table_insert(table, &list1, "First list");
+
+    bidirectional_hash_table_destroy(table);
+    int_array_list_destroy(&list1);
+    int_array_list_destroy(&list2);
 }
