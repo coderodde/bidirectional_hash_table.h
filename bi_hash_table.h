@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 struct bidirectional_hash_table_key_value_pair;
 struct bidirectional_hash_table_collision_tree_node;
@@ -12,13 +13,13 @@ struct bidirectional_hash_table_key_value_pair_iterator;
 /******************************************************************
 Initializes a bidirectional hash table with the specified capacity.
 ******************************************************************/
-void bidirectional_hash_table_init(struct bidirectional_hash_table* table, 
-                                   size_t capacity,
-                                   float load_factor_threshold,
-                                   size_t (*hash_function_key)(void*),
-                                   size_t (*hash_function_value)(void*),
-                                   int (*compare_function_key)(void*),
-                                   int (*compare_function_value)(void*));
+struct bidirectional_hash_table* 
+bidirectional_hash_table_create(size_t capacity,
+                                float load_factor_threshold,
+                                uint64_t (*hash_function_key) (void*),
+                                uint64_t (*hash_function_val) (void*),
+                                int (*compare_function_key)   (void*, void*),
+                                int (*compare_function_val)   (void*, void*));
 
 /*****************************************************************
 Destroys a bidirectional hash table and frees all allocated memory.                                                     
@@ -31,7 +32,7 @@ exists, does nothing. If either the key or the value is already present in the t
 it will be replaced with the new mapping. Returns true only if the hash table has
 changed. False otherwise.
 ************************************************************************************/
-int bidirectional_hash_table_insert(struct bidirectional_hash_table* table, void* key, void* val);
+bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, void* key, void* val);
 
 /*********************************************************************************
 Finds the value associated with the specified key in the bidirectional hash table.
@@ -41,7 +42,7 @@ void* bidirectional_hash_table_find_by_key(struct bidirectional_hash_table* tabl
 /*********************************************************************************
 Finds the key associated with the specified value in the bidirectional hash table.
 *********************************************************************************/
-void* bidirectional_hash_table_find_by_value(struct bidirectional_hash_table* table, void* value);
+void* bidirectional_hash_table_find_by_val(struct bidirectional_hash_table* table, void* val);
 
 /**********************************************************************************************
 Removes the key-value pair associated with the specified key from the bidirectional hash table.
@@ -51,7 +52,7 @@ bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* tab
 /************************************************************************************************
 Removes the key-value pair associated with the specified value from the bidirectional hash table.
 ************************************************************************************************/
-bool bidirectional_hash_table_remove_by_value(struct bidirectional_hash_table* table, void* value);
+bool bidirectional_hash_table_remove_by_val(struct bidirectional_hash_table* table, void* val);
 
 /****************************************************************************************
 Returns true if the bidirectional hash table contains the specified key, false otherwise.
@@ -61,7 +62,7 @@ bool bidirectional_hash_table_contains_key(struct bidirectional_hash_table* tabl
 /******************************************************************************************
 Returns true if the bidirectional hash table contains the specified value, false otherwise.
 ******************************************************************************************/
-bool bidirectional_hash_table_contains_value(struct bidirectional_hash_table* table, void* value);
+bool bidirectional_hash_table_contains_val(struct bidirectional_hash_table* table, void* val);
 
 /*********************************************************
 Creates an iterator over the hash table's key/value pairs.
