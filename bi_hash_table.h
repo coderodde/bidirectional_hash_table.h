@@ -10,10 +10,10 @@ struct bidirectional_hash_table_collision_tree_node;
 struct bidirectional_hash_table;
 struct bidirectional_hash_table_key_value_pair_iterator;
 
-/******************************************************************
-Initializes a bidirectional hash table with the specified capacity.
-******************************************************************/
-struct bidirectional_hash_table* 
+/**************************************************************
+Creates a bidirectional hash table with the specified capacity.
+**************************************************************/
+struct bidirectional_hash_table*
 bidirectional_hash_table_create(size_t capacity,
                                 float load_factor_threshold,
                                 uint64_t (*hash_function_key) (void*),

@@ -90,16 +90,16 @@ static float fix_load_factor(float load_factor_threshold) {
     return load_factor_threshold;
 }
 
-/******************************************************************
-Initializes a bidirectional hash table with the specified capacity.
-******************************************************************/
+/**************************************************************
+Creates a bidirectional hash table with the specified capacity.
+**************************************************************/
 struct bidirectional_hash_table*
-bidirectional_hash_table_init(size_t capacity,
-                              float load_factor_threshold,
-                              uint64_t (*hash_function_key) (void*),
-                              uint64_t (*hash_function_val) (void*),
-                              int (*compare_function_key)   (void*, void*),
-                              int (*compare_function_val)   (void*, void*)) {
+bidirectional_hash_table_create(size_t capacity,
+                                float load_factor_threshold,
+                                uint64_t (*hash_function_key) (void*),
+                                uint64_t (*hash_function_val) (void*),
+                                int (*compare_function_key)   (void*, void*),
+                                int (*compare_function_val)   (void*, void*)) {
 
     struct bidirectional_hash_table* table = malloc(sizeof(struct bidirectional_hash_table));
 
@@ -302,17 +302,17 @@ tree_rotate_right(struct bidirectional_hash_table_collision_tree_node* node1) {
 }
 
 static struct bidirectional_hash_table_collision_tree_node* tree_rotate_right_left(struct bidirectional_hash_table_collision_tree_node* node1) {
-    struct bidirectional_hash_tree_collision_tree_node* node2 = node1->right;
+    struct bidirectional_hash_table_collision_tree_node* node2 = node1->right;
 
     node1->right = tree_rotate_right(node2);
-    return tree_left_rotate(node1);
+    return tree_rotate_left(node1);
 }
 
 static struct bidirectional_hash_table_collision_tree_node* tree_rotate_left_right(struct bidirectional_hash_table_collision_tree_node* node1) {
     struct bidirectional_hash_table_collision_tree_node* node2 = node1->left;
 
     node1->left = tree_rotate_left(node2);   
-    return tree_right_rotate(node1);
+    return tree_rotate_right(node1);
 }
 
 /*****************************************************************************
@@ -347,7 +347,6 @@ static void fix_after_insertion(
             if (grandparent != NULL) {
                 grandparent->height = MAX(height(grandparent->left),
                                           height(grandparent->right)) + 1;
-            }
 
             return;
         } else if (height(parent->right) == height(parent->left) + 2) {
@@ -359,6 +358,7 @@ static void fix_after_insertion(
                 sub_tree = tree_rotate_right_left(parent);
             }
 
+            }
             if (grandparent == NULL) {
                 *root = sub_tree;
             } else if (grandparent->left == parent) {
@@ -564,7 +564,7 @@ it will be replaced with the new mapping.
 ************************************************************************************/
 bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, void* key, void* val) {
     if (table == NULL || key == NULL || val == NULL) {
-        return;
+        return false;
     }
 
     const size_t key_index = table->hash_function_key(key) % table->capacity;
@@ -830,7 +830,7 @@ int bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_key
     struct bidirectional_hash_table_collision_tree_node* node = iterator->current_tree_node;
 
     // Remove the node from the collision tree
-    remove_node_from_collision_tree(iterator->table->collision_trees_forward[iterator->table_socket_index], node);
+    remove_node_from_collision_tree(&iterator->table->collision_trees_forward[iterator->table_socket_index], node);
 
     // Update the iterator's current tree node
     iterator->current_tree_node = find_successor(node);
