@@ -60,6 +60,7 @@ struct bidirectional_hash_table_key_value_pair_iterator {
     struct bidirectional_hash_table* table;
     size_t table_socket_index;
     struct bidirectional_hash_table_collision_tree_node* current_tree_node;
+    struct bidirectional_hash_table_collision_tree_node* last_returned_tree_node;
 };
 
 static struct bidirectional_hash_table_collision_tree_node* create_collision_tree_node(struct bidirectional_hash_table_key_value_pair* kv_pair) {
@@ -89,6 +90,7 @@ static float fix_load_factor(float load_factor_threshold) {
 
     return load_factor_threshold;
 }
+
 
 /**************************************************************
 Creates a bidirectional hash table with the specified capacity.
@@ -714,7 +716,7 @@ bool bidirectional_hash_table_contains_key(struct bidirectional_hash_table* tabl
 /******************************************************************************************
 Returns true if the bidirectional hash table contains the specified value, false otherwise.
 ******************************************************************************************/
-bool bidirectional_hash_table_contains_value(struct bidirectional_hash_table* table, void* val) {
+bool bidirectional_hash_table_contains_val(struct bidirectional_hash_table* table, void* val) {
     if (table == NULL || val == NULL) {
         return false;
     }
@@ -744,11 +746,20 @@ Creates an iterator over the hash table's key/value pairs.
 *********************************************************/
 struct bidirectional_hash_table_key_value_pair_iterator* bidirectional_hash_table_create_iterator(struct bidirectional_hash_table* table) {
 
-    struct bidirectional_hash_table_key_value_pair_iterator* it = NOT_NULL(malloc(sizeof *it));
+    struct bidirectional_hash_table_key_value_pair_iterator* it = malloc(sizeof *it);
 
     it->table              = table;
     it->table_socket_index = find_first_table_socket_index(table);
-    it->current_tree_node  = find_minimum(table->collision_trees_forward[it->table_socket_index]);
+
+    if (it->table_socket_index == SIZE_MAX) {
+        // Iterating over an empty table, no key-value pairs to iterate over.
+        it->current_tree_node       = NULL;
+        it->last_returned_tree_node = NULL;
+        return it;
+    }
+
+    it->current_tree_node       = find_minimum(table->collision_trees_forward[it->table_socket_index]);
+    it->last_returned_tree_node = NULL;
 
     return it;
 }
@@ -763,25 +774,38 @@ bool bidirectional_hash_table_iterator_has_next(struct bidirectional_hash_table_
 /**********************************************************************************
 Loads the current key/value pair and advances the iteration pointer one pair ahead.
 **********************************************************************************/
-int bidirectional_hash_table_iterator_next(struct bidirectional_hash_table_key_value_pair_iterator* iterator, void** pkey, void** pval) {
+bool bidirectional_hash_table_iterator_next(struct bidirectional_hash_table_key_value_pair_iterator* iterator, void** pkey, void** pval) {
     if (!bidirectional_hash_table_iterator_has_next(iterator)) {
-        return -1;
+        // Iteration exhausted, no more key-value pairs to iterate over.
+        return false;
     }
 
-    struct bidirectional_hash_table_collision_tree_node* node = iterator->current_tree_node;
+    struct bidirectional_hash_table_collision_tree_node* target_tree_node = iterator->current_tree_node;
 
-    *pkey = node->key_value_pair->key;
-    *pval = node->key_value_pair->val;
+    *pkey = target_tree_node->key_value_pair->key;
+    *pval = target_tree_node->key_value_pair->val;
 
-    node = find_successor(node);
+    iterator->last_returned_tree_node = target_tree_node;
 
-    if (node == NULL) {
+    // Compute the next node in the iteration sequence.
+    struct bidirectional_hash_table_collision_tree_node* tmp_node = find_successor(target_tree_node);
+
+    if (tmp_node == NULL) {
+        // The current collision tree has been fully traversed, move to the next non-empty collision tree.
         size_t socket_index = find_table_socket_index_starting_from(iterator->table, 
                                                                     iterator->table_socket_index + 1);
 
+        if (socket_index == SIZE_MAX) {
+            // Once here, the iteration is complete.
+            iterator->table_socket_index = SIZE_MAX;
+            return false;
+        }
+        
         iterator->table_socket_index = socket_index;
-        iterator->current_tree_node  = find_minimum(iterator->table->collision_trees_forward[socket_index]);
     }
+
+    iterator->current_tree_node = tmp_node;
+    return true;
 }
 
 static void remove_node_from_collision_tree(struct bidirectional_hash_table_collision_tree_node** root, struct bidirectional_hash_table_collision_tree_node* node) {
@@ -822,9 +846,9 @@ static void remove_node_from_collision_tree(struct bidirectional_hash_table_coll
 /*****************************************************
 Removes the most recent key/value pair from the table.
 *****************************************************/
-int bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_key_value_pair_iterator* iterator) {
+bool bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_key_value_pair_iterator* iterator) {
     if (!bidirectional_hash_table_iterator_has_next(iterator)) {
-        return -1;
+        return false;
     }
 
     struct bidirectional_hash_table_collision_tree_node* node = iterator->current_tree_node;

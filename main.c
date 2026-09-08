@@ -1,6 +1,7 @@
 #include "bi_hash_table.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -110,6 +111,40 @@ int main() {
         str_cmp);
 
     bidirectional_hash_table_insert(table, &list1, "First list");
+    bidirectional_hash_table_insert(table, &list2, "Second list");
+
+    printf("%d\n", bidirectional_hash_table_contains_key(table, &list1));
+    printf("%d\n", bidirectional_hash_table_contains_key(table, &list2));
+
+    int_array_list_append(&list1, 10);
+    printf("%d\n", bidirectional_hash_table_contains_key(table, &list1));
+
+    printf("%d\n", bidirectional_hash_table_contains_val(table, "First list"));
+    printf("%d\n", bidirectional_hash_table_contains_val(table, "Second list"));
+    printf("%d\n", bidirectional_hash_table_contains_val(table, "Third list"));
+
+    struct bidirectional_hash_table_key_value_pair_iterator* iterator = bidirectional_hash_table_create_iterator(table);
+
+    while (bidirectional_hash_table_iterator_has_next(iterator)) {
+
+        void* key;
+        void* val;
+    
+        bidirectional_hash_table_iterator_next(iterator, &key, &val);
+
+        const char* value = val;
+        printf("Key: [");
+
+        for (size_t i = 0; i < int_array_list_size(key); ++i) {
+            printf("%d", int_array_list_get(key, i));
+
+            if (i < int_array_list_size(key) - 1) {
+                printf(", ");
+            }
+        }
+
+        printf("], Value: %s\n", value);
+    }
 
     bidirectional_hash_table_destroy(table);
     int_array_list_destroy(&list1);

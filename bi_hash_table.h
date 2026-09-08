@@ -77,11 +77,11 @@ bool bidirectional_hash_table_iterator_has_next(struct bidirectional_hash_table_
 /**********************************************************************************
 Loads the current key/value pair and advances the iteration pointer one pair ahead.
 **********************************************************************************/
-int bidirectional_hash_table_iterator_next(struct bidirectional_hash_table_key_value_pair_iterator* iterator, void** pkey, void** pval);
+bool bidirectional_hash_table_iterator_next(struct bidirectional_hash_table_key_value_pair_iterator* iterator, void** pkey, void** pval);
 
 /*****************************************************
 Removes the most recent key/value pair from the table.
 *****************************************************/
-int bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_key_value_pair_iterator* iterator);
+bool bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_key_value_pair_iterator* iterator);
 
 #endif // IO_GITHUB_CODERODDE_C_BIDIRECTIONAL_HASH_TABLE_H
