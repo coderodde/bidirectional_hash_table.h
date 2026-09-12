@@ -802,9 +802,11 @@ bool bidirectional_hash_table_iterator_next(struct bidirectional_hash_table_key_
         }
         
         iterator->table_socket_index = socket_index;
+        iterator->current_tree_node  = find_minimum(iterator->table->collision_trees_forward[socket_index]);
+    } else {
+        iterator->current_tree_node = tmp_node;
     }
 
-    iterator->current_tree_node = tmp_node;
     return true;
 }
 
