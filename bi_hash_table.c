@@ -543,7 +543,7 @@ static void delete_from_collision_tree(struct bidirectional_hash_table_collision
             successor_right_child->parent = successor_parent;
         }
 
-        free(successor_node);
+        successor_node->key_value_pair = tmp_kv_pair;
         return successor_node;
     }
 

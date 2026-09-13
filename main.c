@@ -5,65 +5,55 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct int_array_list {
-    int* items;
-    size_t size;
-};
-
-void int_array_list_init(struct int_array_list* list) {
-    list->items = malloc(10 * sizeof(int));
-    list->size = 0;
-}
-
-void int_array_list_destroy(struct int_array_list* list) {
-    free(list->items);
-    list->items = NULL;
-    list->size = 0;
-}   
-
-void int_array_list_append(struct int_array_list* list, int value) {
-    list->items[list->size++] = value;
-}
-
-int int_array_list_get(struct int_array_list* list, size_t index) {
-    return list->items[index];
-}
-
-size_t int_array_list_size(struct int_array_list* list) {
-    return list->size;
-}
-
 uint64_t int_array_list_hash(void* ptr) {
-    struct int_array_list* list = ptr;
+    int* arr = (int*) ptr;
+    size_t len = 0;
+
+    for (size_t len = 0; !arr[len]; ++len) {
+    
+    }
+
     uint64_t hash = UINT64_C(14695981039346656037);
 
-    for (size_t i = 0; i < list->size; ++i) {
-        uint32_t x = (uint32_t) list->items[i];
+    for (size_t i = 0; i < len; ++i) {
+        uint32_t x = (uint32_t) arr[i];
         hash ^= x;
         hash *= UINT64_C(1099511628211);
     }
 
-    hash ^= list->size;
+    hash ^= len;
     hash *= UINT64_C(1099511628211);
     return hash;
 }
 
 int int_array_lists_compare(void* a, void* b) {
-    struct int_array_list* list_a = a;
-    struct int_array_list* list_b = b;
-    int cmp = (int) list_a->size - (int) list_b->size;
+    int* arr_a = a;
+    int* arr_b = b;
 
-    if (cmp != 0) {
-        return cmp;
+    size_t len_a = 0;
+    size_t len_b = 0;
+
+    for (; !arr_a[len_a]; ++len_a) {}
+    for (; !arr_b[len_b]; ++len_b) {}
+
+    if (len_a < len_b) {
+        return -1;
     }
 
-    for (size_t i = 0; i < int_array_list_size(a); ++i) {
-        int ia = int_array_list_get(a, i);
-        int ib = int_array_list_get(b, i);
-        cmp = ia - ib;
+    if (len_a > len_b) {
+        return 1;
+    }
 
-        if (cmp != 0) {
-            return cmp;
+    for (size_t i = 0; i < len_a; ++i) {
+        int ia = arr_a[i];
+        int ib = arr_b[i];
+
+        if (ia < ib) {
+            return -1;
+        }
+
+        if (ia > ib) {
+            return 0;
         }
     }
 
@@ -88,19 +78,17 @@ uint64_t hash_c_string(void* ptr) {
     return hash;
 }
 
-int main() {
-    struct int_array_list list1;
-    struct int_array_list list2;
+int main(void) {
+    int* arr_a = calloc(10, sizeof(int));
+    int* arr_b = calloc(8, sizeof(int));
 
-    int_array_list_init(&list1);
-    int_array_list_init(&list2);
+    arr_a[0] = 1;
+    arr_a[1] = 2;
+    arr_a[2] = 3;
 
-    int_array_list_append(&list1, 1);
-    int_array_list_append(&list1, 2);
-
-    int_array_list_append(&list2, 1);
-    int_array_list_append(&list2, 2);
-    int_array_list_append(&list2, 3);
+    arr_b[0] = 4;
+    arr_b[1] = 5;
+    arr_b[2] = 6;
 
     struct bidirectional_hash_table* table = bidirectional_hash_table_create(
         10, 
@@ -110,14 +98,15 @@ int main() {
         int_array_lists_compare,
         str_cmp);
 
-    bidirectional_hash_table_insert(table, &list1, "First list");
-    bidirectional_hash_table_insert(table, &list2, "Second list");
+    bidirectional_hash_table_insert(table, arr_a, "First list");
+    bidirectional_hash_table_insert(table, arr_b, "Second list");
 
-    printf("%d\n", bidirectional_hash_table_contains_key(table, &list1));
-    printf("%d\n", bidirectional_hash_table_contains_key(table, &list2));
+    printf("%d\n", bidirectional_hash_table_contains_key(table, arr_a));
+    printf("%d\n", bidirectional_hash_table_contains_key(table, arr_b));
 
-    int_array_list_append(&list1, 10);
-    printf("%d\n", bidirectional_hash_table_contains_key(table, &list1));
+    arr_a[1] = -1;
+
+    printf("%d\n", bidirectional_hash_table_contains_key(table, arr_a));
 
     printf("%d\n", bidirectional_hash_table_contains_val(table, "First list"));
     printf("%d\n", bidirectional_hash_table_contains_val(table, "Second list"));
@@ -132,13 +121,15 @@ int main() {
     
         bidirectional_hash_table_iterator_next(iterator, &key, &val);
 
+        const int* arr = key;
         const char* value = val;
+
         printf("Key: [");
 
-        for (size_t i = 0; i < int_array_list_size(key); ++i) {
-            printf("%d", int_array_list_get(key, i));
+        for (size_t i = 0; arr[i] != 0; ++i) {
+            printf("%d", arr[i]);
 
-            if (i < int_array_list_size(key) - 1) {
+            if (arr[i + 1] != 0) {
                 printf(", ");
             }
         }
@@ -146,7 +137,11 @@ int main() {
         printf("], Value: %s\n", value);
     }
 
+    bidirectional_hash_table_remove_by_val(table, "Second list");
+    printf("%d\n", bidirectional_hash_table_contains_val(table, "Second list"));
+
     bidirectional_hash_table_destroy(table);
-    int_array_list_destroy(&list1);
-    int_array_list_destroy(&list2);
+    free(arr_a);
+    free(arr_b);
+    return 0;
 }
