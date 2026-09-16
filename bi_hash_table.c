@@ -327,16 +327,12 @@ static void fix_after_insertion(
     struct bidirectional_hash_table_collision_tree_node** root,
     struct bidirectional_hash_table_collision_tree_node* node) {
 
-    struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
-    struct bidirectional_hash_table_collision_tree_node* grandparent;
-    struct bidirectional_hash_table_collision_tree_node* sub_tree;
-
-    while (parent != NULL) {
+    while (node != NULL) {
         if (height(parent->left) == height(parent->right) + 2) {
             grandparent = parent->parent;
 
             if (height(parent->left->left) >= height(parent->left->right)) {
-                sub_tree = tree_rotate_right(parent);
+                sub_tree = tree_rotate_right(node);
             } else {
                 sub_tree = tree_rotate_left_right(parent);
             }
@@ -387,61 +383,43 @@ static void fix_after_insertion(
 /*****************************************************************************
 Balances the AVL tree after an deletion operation to maintain its properties.
 *****************************************************************************/
-static void fix_after_deltion(
+static void fix_after_deletion(
     struct bidirectional_hash_table_collision_tree_node** root,
     struct bidirectional_hash_table_collision_tree_node* node) {
 
-    struct bidirectional_hash_table_collision_tree_node* parent = node->parent;
-    struct bidirectional_hash_table_collision_tree_node* grandparent;
-    struct bidirectional_hash_table_collision_tree_node* sub_tree;
+    while (node != NULL) {
+        node->height = MAX(height(node->left), height(node->right)) + 1;
 
-    while (parent != NULL) {
-        if (height(parent->left) == height(parent->right) + 2) {
-            grandparent = parent->parent;
+        struct bidirectional_hash_table_collision_tree_node* parent   = node->parent;
+        struct bidirectional_hash_table_collision_tree_node* sub_tree = node;
 
-            if (height(parent->left->left) >= height(parent->left->right)) {
+        if (height(node->left) == height(node->right) + 2) {
+            if (height(node->left->left) >= height(node->left->right)) {
                 sub_tree = tree_rotate_right(parent);
             } else {
-                sub_tree = tree_rotate_left_right(parent);
+                sub_tree = tree_rotate_left_right(node);
             }
-
-            if (grandparent == NULL) {
-                *root = sub_tree;
-            } else if (grandparent->left == parent) {
-                grandparent->left = sub_tree;
+        } else if (height(node->right) == height(node->left) + 2) {
+            if (height(node->right->right) >= height(node->right->left)) {
+                sub_tree = tree_rotate_left(node);
             } else {
-                grandparent->right = sub_tree;
+                sub_tree = tree_rotate_right_left(node);
+            }
+        }
+
+        if (sub_tree != node) {
+
+            if (parent == NULL) {
+                *root = sub_tree;
+            } else if (parent->left == node) {
+                parent->left = sub_tree;
+            } else {
+                parent->right = sub_tree;
             }
 
-            if (grandparent != NULL) {
-                grandparent->height = MAX(height(grandparent->left),
-                                            height(grandparent->right)) + 1;
-            }
-        } else if (height(parent->right) == height(parent->left) + 2) {
-            grandparent = parent->parent;
-
-                if (height(parent->right->right) >= height(parent->right->left)) {
-                    sub_tree = tree_rotate_left(parent);
-                } else {
-                    sub_tree = tree_rotate_right_left(parent);
-                }
-
-                if (grandparent == NULL) {
-                    *root = sub_tree;
-                } else if (grandparent->left == parent) {
-                    grandparent->left = sub_tree;
-                } else {
-                    grandparent->right = sub_tree;
-                }
-
-                if (grandparent != NULL) {
-                    grandparent->height = MAX(height(grandparent->left),
-                        height(grandparent->right)) + 1;
-                }
-            }
-
-            parent->height = MAX(height(parent->left), height(parent->right)) + 1;
-            parent = parent->parent;
+            node = parent;
+        } else {
+            node = node->parent;
         }
     }
 }
@@ -649,28 +627,26 @@ bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, voi
     struct bidirectional_hash_table_collision_tree_node* existing_key_node = get_node_by_key(table, table->collision_trees_forward [key_index], key);
     struct bidirectional_hash_table_collision_tree_node* existing_val_node = get_node_by_val(table, table->collision_trees_backward[val_index], val);
 
-    if (existing_key_node != NULL && existing_val_node != NULL) {
-        if (existing_key_node->key_value_pair == existing_val_node->key_value_pair) {
-            // Key-value pair already exists, do nothing.
-            return false;
-        } else {
-            // Key and value are different, remove the existing key-value pair:
-            bidirectional_hash_table_remove_by_key(table, existing_key_node->key_value_pair->key);
-            bidirectional_hash_table_remove_by_val(table, existing_val_node->key_value_pair->val);
-
-            // Insert new key-value pair:
-            bidirectional_hash_table_insert(table, key, val);
-            return true;
-        }
-    } else if (existing_key_node == NULL && existing_val_node == NULL) {
-        add_non_existing_key_val_pair(table, key, val);
-    } else if (existing_key_node != NULL) {
-    
-    } else {
-        // Insert new key-value pair
+    if (existing_key_node != NULL &&
+        existing_val_node != NULL &&
+        existing_key_node->key_value_pair == 
+        existing_val_node->key_value_pair) {
+        return false; // Already present mapping, no changes.
     }
 
-    return true;
+    if (existing_key_node != NULL) {
+        if (!bidirectional_hash_table_remove_by_key(table, key)) {
+            return false;
+        }
+    }
+
+    if (existing_val_node != NULL) {
+        if (!bidirectional_hash_table_remove_by_val(table, val)) {
+            return false;
+        }
+    }
+
+    return add_non_existing_key_val_pair(table, key, val);
 }
 
 /*********************************************************************************
