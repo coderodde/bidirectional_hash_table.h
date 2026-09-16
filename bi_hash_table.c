@@ -76,7 +76,7 @@ static struct bidirectional_hash_table_collision_tree_node* create_collision_tre
     node->left           = NULL;
     node->right          = NULL;
     node->parent         = NULL;
-    node->height         = -1;
+    node->height         = 0;
 
     return node;
 }
@@ -623,10 +623,13 @@ static bool add_non_existing_key_val_pair(struct bidirectional_hash_table* table
         // Rollback the insertion into the forward tree if the backward insertion fails
         struct bidirectional_hash_table_collision_tree_node* node_to_remove = get_node_by_key(table, table->collision_trees_forward[key_index], key);
         delete_from_collision_tree(&table->collision_trees_forward[key_index], node_to_remove);
+        
+        free(node_to_remove);
         free(new_kv_pair);
         return false;
     }
 
+    table->size++;
     return true;
 }
 
@@ -717,22 +720,29 @@ bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* tab
     }
 
     const size_t key_index = table->hash_function_key(key) % table->capacity;
-    struct bidirectional_hash_table_collision_tree_node* node = get_node_by_key(table, table->collision_trees_forward[key_index], key);
+    struct bidirectional_hash_table_collision_tree_node* forward_node = get_node_by_key(table, table->collision_trees_forward[key_index], key);
     
-    if (node == NULL) {
+    if (forward_node == NULL) {
         return false;
     }
 
-    void* value = node->key_value_pair->val;
-    const size_t val_index = table->hash_function_val(value) % table->capacity;
+    struct bidirectional_hash_table_key_value_pair* kv_pair = forward_node->key_value_pair;
+    void* val = kv_pair->val;
+    const size_t val_index = table->hash_function_val(val) % table->capacity;
+
+    struct bidirectional_hash_table_collision_tree_node* backward_node = 
+    get_node_by_val(table,
+                    table->collision_trees_backward[val_index],
+                    val);
 
     // Remove the node from both collision trees
-    delete_from_collision_tree(&table->collision_trees_forward [key_index], node);
-    delete_from_collision_tree(&table->collision_trees_backward[val_index], node);
+    struct bidirectional_hash_table_collision_tree_node* removed_forward_node  = delete_from_collision_tree(&table->collision_trees_forward [key_index], forward_node);
+    struct bidirectional_hash_table_collision_tree_node* removed_backward_node = delete_from_collision_tree(&table->collision_trees_backward[val_index], backward_node);
 
     // Free the key-value pair
-    free(node->key_value_pair);
-    free(node);
+    free(kv_pair);
+    free(removed_forward_node);
+    free(removed_backward_node);
 
     table->size--;
     return true;
@@ -748,22 +758,29 @@ bool bidirectional_hash_table_remove_by_val(struct bidirectional_hash_table* tab
 
     const size_t val_index = table->hash_function_val(val) % table->capacity;
 
-    struct bidirectional_hash_table_collision_tree_node* node = get_node_by_val(table, table->collision_trees_backward[val_index], val);
+    struct bidirectional_hash_table_collision_tree_node* backward_node = get_node_by_val(table, table->collision_trees_backward[val_index], val);
     
-    if (node == NULL) {
+    if (backward_node == NULL) {
         return false;
     }
 
-    void* key = node->key_value_pair->key;
+    struct bidirectional_hash_table_key_value_pair* kv_pair = backward_node->key_value_pair;
+
+    void* key = kv_pair->key;
+
     const size_t key_index = table->hash_function_key(key) % table->capacity;
 
-    // Remove the node from both collision trees
-    delete_from_collision_tree(&table->collision_trees_forward [key_index], node);
-    delete_from_collision_tree(&table->collision_trees_backward[val_index], node);
+    struct bidirectional_hash_table_collision_tree_node* forward_node = 
+        get_node_by_key(table,
+                        table->collision_trees_forward[key_index],
+                        key);
 
-    // Free the key-value pair
-    free(node->key_value_pair);
-    free(node);
+    struct bidirectional_hash_table_collision_tree_node* removed_forward_node  = delete_from_collision_tree(&table->collision_trees_forward [key_index], forward_node);
+    struct bidirectional_hash_table_collision_tree_node* removed_backward_node = delete_from_collision_tree(&table->collision_trees_backward[val_index], backward_node);    
+
+    free(removed_forward_node);
+    free(removed_backward_node);
+    free(kv_pair);
 
     table->size--;
     return true;
