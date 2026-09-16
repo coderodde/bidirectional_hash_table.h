@@ -568,9 +568,9 @@ static bool add_non_existing_key_val_pair(struct bidirectional_hash_table* table
     if (!insert_into_collision_tree(table, &table->collision_trees_backward[val_index], new_kv_pair, BACKWARD)) {
         // Rollback the insertion into the forward tree if the backward insertion fails
         struct bidirectional_hash_table_collision_tree_node* node_to_remove = get_node_by_key(table, table->collision_trees_forward[key_index], key);
-        delete_from_collision_tree(&table->collision_trees_forward[key_index], node_to_remove);
+        struct bidirectional_hash_table_collision_tree_node* removed_node   = delete_from_collision_tree(&table->collision_trees_forward[key_index], node_to_remove);
         
-        free(node_to_remove);
+        free(removed_node);
         free(new_kv_pair);
         return false;
     }
