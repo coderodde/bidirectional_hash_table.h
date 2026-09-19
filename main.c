@@ -4,26 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 uint64_t int_array_list_hash(void* ptr) {
-    int* arr = (int*) ptr;
-    size_t len = 0;
-
-    for (size_t len = 0; !arr[len]; ++len) {
-    
-    }
-
-    uint64_t hash = UINT64_C(14695981039346656037);
-
-    for (size_t i = 0; i < len; ++i) {
-        uint32_t x = (uint32_t) arr[i];
-        hash ^= x;
-        hash *= UINT64_C(1099511628211);
-    }
-
-    hash ^= len;
-    hash *= UINT64_C(1099511628211);
-    return hash;
+    return 3;
 }
 
 int int_array_lists_compare(void* a, void* b) {
@@ -79,16 +63,31 @@ uint64_t hash_c_string(void* ptr) {
 }
 
 int main(void) {
-    int* arr_a = calloc(10, sizeof(int));
-    int* arr_b = calloc(8, sizeof(int));
 
-    arr_a[0] = 1;
-    arr_a[1] = 2;
-    arr_a[2] = 3;
+    srand((unsigned int)time(NULL));
 
-    arr_b[0] = 4;
-    arr_b[1] = 5;
-    arr_b[2] = 6;
+    int** arrs  = calloc(1000, sizeof(int*));
+    char** strs = calloc(1000, sizeof(char*));
+
+    for (size_t i = 0; i < 1000; ++i) {
+        arrs[i] = calloc(10, sizeof(int));
+
+        for (size_t j = 0; j < 10; ++j) {
+            arrs[i][j] = (int) rand() % 100;
+        }
+
+        arrs[i][rand() % 10] = 0;
+    }
+
+    for (size_t i = 0; i < 1000; ++i) {
+        strs[i] = calloc(10, sizeof(char));
+
+        for (size_t j = 0; j < 10; ++j) {
+            strs[i][j] = (char)(rand() % 26 + 'a');
+        }
+
+        strs[i][rand() % 10] = '\0';
+    }
 
     struct bidirectional_hash_table* table = bidirectional_hash_table_create(
         10, 
@@ -98,50 +97,50 @@ int main(void) {
         int_array_lists_compare,
         str_cmp);
 
-    bidirectional_hash_table_insert(table, arr_a, "First list");
-    bidirectional_hash_table_insert(table, arr_b, "Second list");
+    for (size_t i = 0; i < 1000; ++i) {
+        bidirectional_hash_table_insert(table, arrs[i], strs[i]);
 
-    printf("%d\n", bidirectional_hash_table_contains_key(table, arr_a));
-    printf("%d\n", bidirectional_hash_table_contains_key(table, arr_b));
-
-    arr_a[1] = -1;
-
-    printf("%d\n", bidirectional_hash_table_contains_key(table, arr_a));
-
-    printf("%d\n", bidirectional_hash_table_contains_val(table, "First list"));
-    printf("%d\n", bidirectional_hash_table_contains_val(table, "Second list"));
-    printf("%d\n", bidirectional_hash_table_contains_val(table, "Third list"));
-
-    struct bidirectional_hash_table_key_value_pair_iterator* iterator = bidirectional_hash_table_create_iterator(table);
-
-    while (bidirectional_hash_table_iterator_has_next(iterator)) {
-
-        void* key;
-        void* val;
-    
-        bidirectional_hash_table_iterator_next(iterator, &key, &val);
-
-        const int* arr = key;
-        const char* value = val;
-
-        printf("Key: [");
-
-        for (size_t i = 0; arr[i] != 0; ++i) {
-            printf("%d", arr[i]);
-
-            if (arr[i + 1] != 0) {
-                printf(", ");
-            }
+        if (!bidirectional_hash_table_check_invariants(table)) {
+            printf("Invariants check failed after insertion of key-value pair %zu\n", i);
+            return 1;
         }
-
-        printf("], Value: %s\n", value);
     }
 
-    bidirectional_hash_table_remove_by_val(table, "Second list");
-    printf("%d\n", bidirectional_hash_table_contains_val(table, "Second list"));
+    for (size_t i = 0; i < 1000; ++i) {
+        if (!bidirectional_hash_table_contains_key(table, arrs[i])) {
+            printf("Key not found after insertion: %zu\n", i);
+            return 1;
+        }
+
+        if (!bidirectional_hash_table_contains_val(table, strs[i])) {
+            printf("Value not found after insertion: %zu\n", i);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i < 1000; ++i) {
+        if (!bidirectional_hash_table_remove_by_key(table, arrs[i])) {
+            printf("Failed to remove key: %zu\n", i);
+            return 1;
+        }
+
+        if (!bidirectional_hash_table_check_invariants(table)) {
+            printf("Invariants check failed after removal of key-value pair %zu\n", i);
+            return 1;
+        }
+    }
 
     bidirectional_hash_table_destroy(table);
-    free(arr_a);
-    free(arr_b);
+
+    for (size_t i = 0; i < 1000; ++i) {
+        free(arrs[i]);
+        free(strs[i]);
+    }
+
+    free(arrs);
+    free(strs);
+
+    puts("[STATUS] All tests passed.");
+
     return 0;
 }

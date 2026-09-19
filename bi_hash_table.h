@@ -84,4 +84,15 @@ Removes the most recent key/value pair from the table.
 *****************************************************/
 bool bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_key_value_pair_iterator* iterator);
 
+/******************************************************************************
+Frees the iterator and all associated resources. Does not touch the hash table.
+******************************************************************************/
+void bidirectional_hash_table_iterator_destroy(struct bidirectional_hash_table_key_value_pair_iterator* iterator);
+
+/***************************************************************************
+Checks the invariants of the bidirectional hash table. Returns true if all
+invariants hold, false otherwise. This function is intended for debugging
+***************************************************************************/
+bool bidirectional_hash_table_check_invariants(struct bidirectional_hash_table* table);
+
 #endif // IO_GITHUB_CODERODDE_C_BIDIRECTIONAL_HASH_TABLE_H

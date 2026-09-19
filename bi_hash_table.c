@@ -202,6 +202,8 @@ void bidirectional_hash_table_destroy(struct bidirectional_hash_table* table) {
     table->hash_function_val        = NULL;
     table->compare_function_key     = NULL;
     table->compare_function_val     = NULL;
+
+    free(table);
 }
 
 /*****************************************************************************
@@ -608,6 +610,8 @@ bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, voi
         }
     }
 
+    existing_val_node = get_node_by_val(table, table->collision_trees_backward[val_index], val);
+
     if (existing_val_node != NULL) {
         if (!bidirectional_hash_table_remove_by_val(table, val)) {
             return false;
@@ -760,7 +764,7 @@ bool bidirectional_hash_table_contains_val(struct bidirectional_hash_table* tabl
 }
 
 static size_t find_table_socket_index_starting_from(struct bidirectional_hash_table* table, size_t start_index) {
-    for (size_t i = start_index; i != table->capacity; ++i) {
+    for (size_t i = start_index; i < table->capacity; ++i) {
         if (table->collision_trees_forward[i] != NULL) {
             return i;
         }
@@ -778,7 +782,15 @@ Creates an iterator over the hash table's key/value pairs.
 *********************************************************/
 struct bidirectional_hash_table_key_value_pair_iterator* bidirectional_hash_table_create_iterator(struct bidirectional_hash_table* table) {
 
+    if (table == NULL) {
+        return NULL;
+    }
+
     struct bidirectional_hash_table_key_value_pair_iterator* it = malloc(sizeof *it);
+
+    if (it == NULL) {
+        return NULL;
+    }
 
     it->table              = table;
     it->table_socket_index = find_first_table_socket_index(table);
@@ -800,14 +812,17 @@ struct bidirectional_hash_table_key_value_pair_iterator* bidirectional_hash_tabl
 Returns true only if there is more to iterate.
 *********************************************/
 bool bidirectional_hash_table_iterator_has_next(struct bidirectional_hash_table_key_value_pair_iterator* iterator) {
-    return iterator->next_tree_node != NULL;
+    return iterator != NULL && iterator->next_tree_node != NULL;
 }
 
 /**********************************************************************************
 Loads the current key/value pair and advances the iteration pointer one pair ahead.
 **********************************************************************************/
 bool bidirectional_hash_table_iterator_next(struct bidirectional_hash_table_key_value_pair_iterator* iterator, void** pkey, void** pval) {
-    if (!bidirectional_hash_table_iterator_has_next(iterator)) {
+    if (iterator == NULL ||
+        pkey == NULL ||
+        pval == NULL ||
+        !bidirectional_hash_table_iterator_has_next(iterator)) {
         // Iteration exhausted, no more key-value pairs to iterate over.
         return false;
     }
@@ -846,11 +861,109 @@ bool bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_ke
         return false;
     }
 
-    struct bidirectional_hash_table_collision_tree_node* node_to_remove = iterator->current_tree_node;;
-    struct bidirectional_hash_table_key_value_pair* kv_pair             = node_to_remove->key_value_pair;
-    void* key                                                           = kv_pair->key;
+    struct bidirectional_hash_table_collision_tree_node* current = iterator->current_tree_node;
 
-    bidirectional_hash_table_remove_by_key(iterator->table, key);
+    bool has_two_children = current->left != NULL && current->right != NULL;
+
+    void* key = current->key_value_pair->key;
+
+    if (!bidirectional_hash_table_remove_by_key(iterator->table, key)) {
+        return false;
+    }
+
+    if (has_two_children) {
+        iterator->next_tree_node = current;
+    }
+
     iterator->current_tree_node = NULL;
+    return true;
+}
+
+/******************************************************************************
+Frees the iterator and all associated resources. Does not touch the hash table.
+******************************************************************************/
+void bidirectional_hash_table_iterator_destroy(struct bidirectional_hash_table_key_value_pair_iterator* iterator) {
+    if (iterator == NULL) {
+        return;
+    }
+
+    free(iterator);
+}
+
+static bool collision_tree_check_invariants(struct bidirectional_hash_table_collision_tree_node* node, 
+                                            int (*compare_function)(void*, void*),
+                                            bool is_forward) {
+    if (node == NULL) {
+        return true;
+    }
+
+    if (node->left != NULL) {
+        if (is_forward) {
+            if (compare_function(node->left->key_value_pair->key, node->key_value_pair->key) >= 0) {
+                return false;
+            }
+        } else {
+            if (compare_function(node->left->key_value_pair->val, node->key_value_pair->val) >= 0) {
+                return false;
+            }
+        }
+    }
+
+    if (node->right != NULL) {
+        if (is_forward) {
+            if (compare_function(node->right->key_value_pair->key, node->key_value_pair->key) <= 0) {
+                return false;
+            }
+        } else {
+            if (compare_function(node->right->key_value_pair->val, node->key_value_pair->val) <= 0) {
+                return false;
+            }
+        }
+    }
+
+    return collision_tree_check_invariants(node->left,  compare_function, is_forward) &&
+           collision_tree_check_invariants(node->right, compare_function, is_forward);
+}
+
+static bool is_balanced(struct bidirectional_hash_table_collision_tree_node* node) {
+    if (node == NULL) {
+        return true;
+    }
+
+    int balance = height(node->left) - height(node->right);
+
+    if (balance < -1 || balance > 1) {
+        return false;
+    }
+
+    return is_balanced(node->left) && is_balanced(node->right);
+}
+
+/*************************************************************************
+Checks the invariants of the bidirectional hash table. Returns true if all
+invariants hold, false otherwise. This function is intended for debugging.
+*************************************************************************/
+bool bidirectional_hash_table_check_invariants(struct bidirectional_hash_table* table) {
+    if (table == NULL) {
+        return false;
+    }
+
+    for (size_t i = 0; i < table->capacity; ++i) {
+        struct bidirectional_hash_table_collision_tree_node* rootf = table->collision_trees_forward [i];
+        struct bidirectional_hash_table_collision_tree_node* rootb = table->collision_trees_backward[i];
+
+        if (!collision_tree_check_invariants(rootf, table->compare_function_key, true)) {
+            return false;
+        }
+
+        if (!collision_tree_check_invariants(rootb, table->compare_function_val, false)) {
+            return false;
+        }
+
+        if (!is_balanced(rootf) || !is_balanced(rootb)) {
+            return false;
+        }
+    }
+
     return true;
 }
