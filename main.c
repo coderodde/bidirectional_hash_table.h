@@ -7,12 +7,12 @@
 #include <time.h>
 
 size_t int_ptr_hash(void* ptr) {
-    return (size_t)(*(int*) ptr) % 30;
+    return (size_t)(uintptr_t) ptr % 30;
 }
 
 int int_ptr_compare(void* a, void* b) {
-    const int ia = *(const int*) a;
-    const int ib = *(const int*) b;
+    const uintptr_t ia = (uintptr_t) a;
+    const uintptr_t ib = (uintptr_t) b;
 
     return (ia > ib) - (ia < ib);
 }
