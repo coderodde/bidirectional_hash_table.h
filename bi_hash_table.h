@@ -64,6 +64,17 @@ Returns true if the bidirectional hash table contains the specified value, false
 ******************************************************************************************/
 bool bidirectional_hash_table_contains_val(struct bidirectional_hash_table* table, void* val);
 
+/**********************************************************************
+Returns true if the bidirectional hash table is empty, false otherwise.
+**********************************************************************/
+bool bidirectional_hash_table_is_empty(struct bidirectional_hash_table* table);
+
+/**********************************************************************
+Returns true if the bidirectional hash table is valid, false otherwise.
+This function is intended for debugging purposes only.
+**********************************************************************/
+bool bidirectional_hash_table_check_invariants(struct bidirectional_hash_table* table);
+
 /*********************************************************
 Creates an iterator over the hash table's key/value pairs.
 *********************************************************/
