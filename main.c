@@ -6,11 +6,11 @@
 #include <string.h>
 #include <time.h>
 
-uint64_t int_array_list_hash(void* ptr) {
-    return 0;
+size_t int_ptr_hash(void* ptr) {
+    return (size_t)(*(int*) ptr) % 30;
 }
 
-int int_array_lists_compare(void* a, void* b) {
+int int_ptr_compare(void* a, void* b) {
     const int ia = *(const int*) a;
     const int ib = *(const int*) b;
 
@@ -53,9 +53,9 @@ int main(void) {
     struct bidirectional_hash_table* table = bidirectional_hash_table_create(
         10, 
         0.75f,
-        int_array_list_hash,
+        int_ptr_hash,
         hash_c_string,
-        int_array_lists_compare,
+        int_ptr_compare,
         str_cmp);
 
     for (size_t i = 0; i < 1000; ++i) {
