@@ -81,7 +81,7 @@ int main(void) {
 
     printf("Table variant OK: %d\n", bidirectional_hash_table_check_invariants(table));
 
-    for (size_t i = 0; i < 1000; ++i) {
+    for (size_t i = 0; i < 500; ++i) {
         if (!bidirectional_hash_table_remove_by_key(table, arrs[i])) {
             printf("Failed to remove key: %zu\n", i);
             return 1;
@@ -91,6 +91,35 @@ int main(void) {
             printf("Invariants check failed after removal of key-value pair %zu\n", i);
             return 1;
         }
+    }
+
+    struct bidirectional_hash_table_key_value_pair_iterator* it = bidirectional_hash_table_create_iterator(table);
+
+    while (bidirectional_hash_table_iterator_has_next(it)) {
+        void* key;
+        void* val;
+
+        if (!bidirectional_hash_table_iterator_next(it, &key, &val)) {
+            printf("Iterator failed to get next key-value pair\n");
+            return 1;
+        }
+
+        if (!bidirectional_hash_table_contains_key(table, key)) {
+            printf("Iterator returned a key not in the table\n");
+            return 1;
+        }
+
+        if (!bidirectional_hash_table_contains_val(table, val)) {
+            printf("Iterator returned a value not in the table\n");
+            return 1;
+        }
+
+        bidirectional_hash_table_iterator_remove(it);
+    }
+
+    if (!bidirectional_hash_table_is_empty(table)) {
+        printf("Table is NOT empty after iterator removals.\n");
+        return 1;
     }
 
     bidirectional_hash_table_destroy(table);

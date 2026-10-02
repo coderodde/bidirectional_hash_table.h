@@ -69,6 +69,11 @@ Returns true if the bidirectional hash table is empty, false otherwise.
 **********************************************************************/
 bool bidirectional_hash_table_is_empty(struct bidirectional_hash_table* table);
 
+/*********************************************************************
+Returns the number of key-value pairs in the bidirectional hash table.
+*********************************************************************/
+size_t bidirectional_hash_table_size(struct bidirectional_hash_table* table);
+
 /**********************************************************************
 Returns true if the bidirectional hash table is valid, false otherwise.
 This function is intended for debugging purposes only.

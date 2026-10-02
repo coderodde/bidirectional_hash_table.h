@@ -939,40 +939,18 @@ static bool is_balanced(struct bidirectional_hash_table_collision_tree_node* nod
     return is_balanced(node->left) && is_balanced(node->right);
 }
 
-/*************************************************************************
-Checks the invariants of the bidirectional hash table. Returns true if all
-invariants hold, false otherwise. This function is intended for debugging.
-*************************************************************************/
-/*bool bidirectional_hash_table_check_invariants(struct bidirectional_hash_table* table) {
-    if (table == NULL) {
-        return false;
-    }
-
-    for (size_t i = 0; i < table->capacity; ++i) {
-        struct bidirectional_hash_table_collision_tree_node* rootf = table->collision_trees_forward [i];
-        struct bidirectional_hash_table_collision_tree_node* rootb = table->collision_trees_backward[i];
-
-        if (!collision_tree_check_invariants(rootf, table->compare_function_key, true)) {
-            return false;
-        }
-
-        if (!collision_tree_check_invariants(rootb, table->compare_function_val, false)) {
-            return false;
-        }
-
-        if (!is_balanced(rootf) || !is_balanced(rootb)) {
-            return false;
-        }
-    }
-
-    return true;
-}*/
-
 /**********************************************************************
 Returns true if the bidirectional hash table is empty, false otherwise.
 **********************************************************************/
 bool bidirectional_hash_table_is_empty(struct bidirectional_hash_table* table) {
     return table->size == 0;
+}
+
+/*********************************************************************
+Returns the number of key-value pairs in the bidirectional hash table.
+*********************************************************************/
+size_t bidirectional_hash_table_size(struct bidirectional_hash_table* table) {
+    return table->size;
 }
 
 /**********************************************************************
