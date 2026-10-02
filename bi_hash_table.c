@@ -115,13 +115,10 @@ static void fix_after_insertion(
 Inserts a key-value pair and a tree node into the collision tree of the bidirectional hash table.
 ************************************************************************************************/
 static bool insert_into_collision_tree(struct bidirectional_hash_table* table,
-    struct bidirectional_hash_table_collision_tree_node** root,
-    struct bidirectional_hash_table_collision_tree_node* node,
-    struct bidirectional_hash_table_key_value_pair* kv_pair,
-    enum direction dir) {
-
-    //struct bidirectional_hash_table_collision_tree_node* new_node = create_collision_tree_node(kv_pair);
-
+    						           struct bidirectional_hash_table_collision_tree_node** root,
+                                       struct bidirectional_hash_table_collision_tree_node* node,
+                                       struct bidirectional_hash_table_key_value_pair* kv_pair,
+                                       enum direction dir) {
     if (node == NULL) {
         return false;
     }
@@ -132,7 +129,7 @@ static bool insert_into_collision_tree(struct bidirectional_hash_table* table,
     }
 
     struct bidirectional_hash_table_collision_tree_node* current = *root;
-    struct bidirectional_hash_table_collision_tree_node* parent = NULL;
+    struct bidirectional_hash_table_collision_tree_node* parent  = NULL;
 
     while (current != NULL) {
         parent = current;
@@ -172,6 +169,9 @@ static bool insert_into_collision_tree(struct bidirectional_hash_table* table,
     return true;
 }
 
+/************************************************
+Rehashes the 'node' to the 'new_collision_trees'.
+************************************************/
 static void rehash_collision_tree(struct bidirectional_hash_table* table,
                                   struct bidirectional_hash_table_collision_tree_node* node,
                                   struct bidirectional_hash_table_collision_tree_node** new_collision_trees,
@@ -191,8 +191,19 @@ static void rehash_collision_tree(struct bidirectional_hash_table* table,
     node->height = 0;
 
 
-    rehash_collision_tree(table, left_child,  new_collision_trees, new_capacity, hash_function, dir);
-    rehash_collision_tree(table, right_child, new_collision_trees, new_capacity, hash_function, dir);
+    rehash_collision_tree(table, 
+                          left_child,  
+                          new_collision_trees, 
+                          new_capacity, 
+                          hash_function, 
+                          dir);
+                          
+    rehash_collision_tree(table, 
+                          right_child,
+                          new_collision_trees, 
+                          new_capacity, 
+                          hash_function, 
+                          dir);
 
     void* object = dir == FORWARD 
                  ? node->key_value_pair->key 
@@ -200,7 +211,11 @@ static void rehash_collision_tree(struct bidirectional_hash_table* table,
                  
     size_t index = hash_function(object) % new_capacity;
 
-    insert_into_collision_tree(table, &new_collision_trees[index], node, node->key_value_pair, dir);
+    insert_into_collision_tree(table, 
+                               &new_collision_trees[index], 
+                               node, 
+                               node->key_value_pair, 
+                               dir);
 }
 
 static void rehash_table(struct bidirectional_hash_table* table,
@@ -208,18 +223,28 @@ static void rehash_table(struct bidirectional_hash_table* table,
                          size_t(*hash_function) (void*),
                          enum direction dir) {
 
-    struct bidirectional_hash_table_collision_tree_node** old_collision_trees = (dir == FORWARD) ? table->collision_trees_forward : table->collision_trees_backward;
-    struct bidirectional_hash_table_collision_tree_node** new_collision_trees = NOT_NULL(calloc(new_capacity, sizeof(struct bidirectional_hash_table_collision_tree_node*)));
+    struct bidirectional_hash_table_collision_tree_node** old_collision_trees = 
+        (dir == FORWARD) 
+        ? table->collision_trees_forward
+        : table->collision_trees_backward;
+        
+    struct bidirectional_hash_table_collision_tree_node** new_collision_trees = 
+        NOT_NULL(calloc(new_capacity, 
+                        sizeof(struct bidirectional_hash_table_collision_tree_node*)));
+                        
     const size_t old_capacity = table->capacity;
 
     for (size_t i = 0; i < old_capacity; ++i) {
         struct bidirectional_hash_table_collision_tree_node* root = old_collision_trees[i];
 
-        if (root == NULL) {
-            continue;
+        if (root != NULL) {
+            rehash_collision_tree(table, 
+                                  root, 
+                                  new_collision_trees, 
+                                  new_capacity, 
+                                  hash_function, 
+                                  dir);        
         }
-
-        rehash_collision_tree(table, root, new_collision_trees, new_capacity, hash_function, dir);
     }
 
     free(old_collision_trees);
@@ -239,8 +264,8 @@ bidirectional_hash_table_create(size_t capacity,
                                 float load_factor_threshold,
                                 size_t (*hash_function_key) (void*),
                                 size_t (*hash_function_val) (void*),
-                                int (*compare_function_key)   (void*, void*),
-                                int (*compare_function_val)   (void*, void*)) {
+                                int (*compare_function_key) (void*, void*),
+                                int (*compare_function_val) (void*, void*)) {
 
     if (capacity == 0) {
         return NULL;
@@ -346,9 +371,11 @@ void bidirectional_hash_table_destroy(struct bidirectional_hash_table* table) {
 Attempts to find a collision tree node by the specified key in the hash table.
 Returns a pointer to the node if found, or NULL if not found.
 *****************************************************************************/
-static struct bidirectional_hash_table_collision_tree_node* get_node_by_key(struct bidirectional_hash_table* table,
-                                                                            struct bidirectional_hash_table_collision_tree_node* root, 
-                                                                            void* key) {
+static struct bidirectional_hash_table_collision_tree_node* get_node_by_key(
+    struct bidirectional_hash_table* table,
+    struct bidirectional_hash_table_collision_tree_node* root, 
+    void* key) {
+    
     if (root == NULL || key == NULL) {
         return NULL;
     }
@@ -376,9 +403,11 @@ static struct bidirectional_hash_table_collision_tree_node* get_node_by_key(stru
 Attempts to find a collision tree node by the specified key in the hash table.
 Returns a pointer to the node if found, or NULL if not found.
 *****************************************************************************/
-static struct bidirectional_hash_table_collision_tree_node* get_node_by_val(struct bidirectional_hash_table* table,
-                                                                            struct bidirectional_hash_table_collision_tree_node* root,
-                                                                            void* val) {
+static struct bidirectional_hash_table_collision_tree_node* get_node_by_val(
+    struct bidirectional_hash_table* table,
+    struct bidirectional_hash_table_collision_tree_node* root,
+    void* val) {
+    
     if (table == NULL || val == NULL) {
         return NULL;
     }
@@ -562,6 +591,9 @@ static void fix_after_deletion(
     }
 }
 
+/********************************************************
+Finds the minimum tree node in the tree rooted at 'node'.
+********************************************************/
 static struct bidirectional_hash_table_collision_tree_node* find_minimum(struct bidirectional_hash_table_collision_tree_node* node) {
     while (node->left != NULL) {
         node = node->left;
@@ -570,6 +602,9 @@ static struct bidirectional_hash_table_collision_tree_node* find_minimum(struct 
     return node;
 }
 
+/**********************************
+Finds the successor node of 'node'.
+**********************************/
 static struct bidirectional_hash_table_collision_tree_node* find_successor(struct bidirectional_hash_table_collision_tree_node* node) {
     if (node->right != NULL) {
         return find_minimum(node->right);

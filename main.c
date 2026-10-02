@@ -126,6 +126,77 @@ int main(void) {
         return 1;
     }
 
+    bidirectional_hash_table_insert(table, (void*) 2, "two");
+    
+    if (!bidirectional_hash_table_contains_key(table, (void*) 2)) {
+        puts("[ERROR] !bidirectional_hash_table_contains_by_key(table, 2)");
+        return 1;
+    }
+        
+    if (!bidirectional_hash_table_contains_val(table, (void*) "two")) {
+        puts("[ERROR] !bidirectional_hash_table_contains_by_val(table, \"two\")");
+        return 1;
+    }
+    
+    if ((void*) 2 != bidirectional_hash_table_find_by_val(table, "two")) {
+        puts("[ERROR] 2 != bidirectional_hash_table_find_by_val(table, \"two\")");
+        return 1;
+    }
+    
+    if (strcmp("two", bidirectional_hash_table_find_by_key(table, (void*) 2)) != 0) {
+        puts("[ERROR] strcmp(\"two\", bidirectional_hash_table_find_by_key(table, 2)) != 0");
+        return 1;
+    }
+    
+    bidirectional_hash_table_insert(table, (void*) 2, "three");
+
+    if (!bidirectional_hash_table_contains_key(table, (void*) 2)) {
+        puts("[ERROR] !bidirectional_hash_table_contains_by_key(table, 2)");
+        return 1;
+    }
+        
+    if (!bidirectional_hash_table_contains_val(table, "three")) {
+        puts("[ERROR] !bidirectional_hash_table_contains_by_val(table, \"three\")");
+        return 1;
+    }
+    
+    if (bidirectional_hash_table_contains_val(table, "two")) {
+        puts("[ERROR] bidirectional_hash_table_contains_by_val(table, \"two\")");
+        return 1;
+    }
+    
+    if ((void*) 2 != bidirectional_hash_table_find_by_val(table, "three")) {
+        puts("[ERROR] 2 != bidirectional_hash_table_find_by_val(table, \"three\")");
+        return 1;
+    }
+    
+    if (strcmp("three", bidirectional_hash_table_find_by_key(table, (void*) 2)) != 0) {
+        puts("[ERROR] strcmp(\"three\", bidirectional_hash_table_find_by_key(table, 2)) != 0");
+        return 1;
+    }
+    
+    bidirectional_hash_table_insert(table, (void*) 3, "three");
+    
+    if (!bidirectional_hash_table_contains_key(table, (void*) 3)) {
+        puts("[ERROR] !bidirectional_hash_table_contains_by_key(table, 3)");
+        return 1;
+    }
+        
+    if (!bidirectional_hash_table_contains_val(table, "three")) {
+        puts("[ERROR] !bidirectional_hash_table_contains_by_val(table, \"three\")");
+        return 1;
+    }
+    
+    if ((void*) 3 != bidirectional_hash_table_find_by_val(table, "three")) {
+        puts("[ERROR] 3 != bidirectional_hash_table_find_by_val(table, \"three\")");
+        return 1;
+    }
+    
+    if (strcmp("three", bidirectional_hash_table_find_by_key(table, (void*) 3)) != 0) {
+        puts("[ERROR] strcmp(\"three\", bidirectional_hash_table_find_by_key(table, 3)) != 0");
+        return 1;
+    }
+    
     bidirectional_hash_table_destroy(table);
     free(it);
 
