@@ -47,7 +47,11 @@ int main(void) {
         arrs[i][0] = (int) i + 1;
         strs[i]    = calloc(32, sizeof **strs);
 
+#if defined _WIN32
         sprintf_s(strs[i], 32, "string_%zu", i + 1);
+#else
+        sprintf(strs[i], "string_%zu", i + 1); 
+#endif
     }
 
     struct bidirectional_hash_table* table = bidirectional_hash_table_create(
@@ -123,6 +127,7 @@ int main(void) {
     }
 
     bidirectional_hash_table_destroy(table);
+    free(it);
 
     for (size_t i = 0; i < 1000; ++i) {
         free(arrs[i]);

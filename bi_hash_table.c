@@ -9,7 +9,7 @@
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MINIMUM_CAPACITY 8
 
-static enum direction {
+enum direction {
     FORWARD,
     BACKWARD
 };
