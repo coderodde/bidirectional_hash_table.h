@@ -11,8 +11,8 @@ uint64_t int_array_list_hash(void* ptr) {
 }
 
 int int_array_lists_compare(void* a, void* b) {
-    int* ia = *(const int*) a;
-    int* ib = *(const int*) b;
+    const int ia = *(const int*) a;
+    const int ib = *(const int*) b;
 
     return (ia > ib) - (ia < ib);
 }
