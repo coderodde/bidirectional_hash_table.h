@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define MINIMUM_CAPACITY 8
 
 static enum direction {
     FORWARD,
@@ -69,6 +70,18 @@ struct bidirectional_hash_table_key_value_pair_iterator {
     size_t table_socket_index;
 };
 
+static bool need_to_enlarge_table(struct bidirectional_hash_table* table) {
+    return (float) table->size / (float) table->capacity >= table->load_factor_threshold;
+}
+
+static bool need_to_shrink_table(struct bidirectional_hash_table* table) {
+    if (table->capacity <= MINIMUM_CAPACITY) {
+        return false;
+    }
+
+    return (float) table->size / (float) table->capacity < table->load_factor_threshold / 4.0f;
+}
+
 static struct bidirectional_hash_table_collision_tree_node* create_collision_tree_node(struct bidirectional_hash_table_key_value_pair* kv_pair) {
     struct bidirectional_hash_table_collision_tree_node* node = NOT_NULL(malloc(sizeof(struct bidirectional_hash_table_collision_tree_node)));
 
@@ -93,6 +106,59 @@ static float fix_load_factor(float load_factor_threshold) {
     }
 
     return load_factor_threshold;
+}
+
+static void rehash_collision_tree(struct bidirectional_hash_table* table,
+                                  struct bidirectional_hash_table_collision_tree_node* node,
+                                  struct bidirectional_hash_table_collision_tree_node** new_collision_trees,
+                                  size_t new_capacity,
+                                  size_t(*hash_function) (void*),
+                                  enum direction dir) {
+    if (node == NULL) {
+        return;
+    }
+
+    rehash_collision_tree(table, node->left,  new_collision_trees, new_capacity, hash_function, dir);
+    rehash_collision_tree(table, node->right, new_collision_trees, new_capacity, hash_function, dir);
+
+    struct bidirectional_hash_table_key_value_pair* kv_pair = node->key_value_pair;
+    size_t index;
+    
+    if (dir == FORWARD) {
+        index = hash_function(kv_pair->key) % new_capacity;
+    } else {
+        index = hash_function(kv_pair->val) % new_capacity;
+    }
+
+    insert_into_collision_tree(table, &new_collision_trees[index], node, kv_pair, dir);
+}
+
+static void rehash_table(struct bidirectional_hash_table* table,
+                         size_t new_capacity,
+                         size_t(*hash_function) (void*),
+                         enum direction dir) {
+
+    struct bidirectional_hash_table_collision_tree_node** old_collision_trees = (dir == FORWARD) ? table->collision_trees_forward : table->collision_trees_backward;
+    struct bidirectional_hash_table_collision_tree_node** new_collision_trees = NOT_NULL(calloc(new_capacity, sizeof(struct bidirectional_hash_table_collision_tree_node*)));
+    const size_t old_capacity = table->capacity;
+
+    for (size_t i = 0; i < old_capacity; ++i) {
+        struct bidirectional_hash_table_collision_tree_node* root = old_collision_trees[i];
+
+        if (root == NULL) {
+            continue;
+        }
+
+        rehash_collision_tree(table, root, new_collision_trees, new_capacity, hash_function, dir);
+    }
+
+    free(old_collision_trees);
+
+    if (dir == FORWARD) {
+        table->collision_trees_forward  = new_collision_trees;
+    } else {
+        table->collision_trees_backward = new_collision_trees;
+    }
 }
 
 /**************************************************************
@@ -431,17 +497,18 @@ Inserts a key-value pair into the collision tree of the bidirectional hash table
 ********************************************************************************/
 static bool insert_into_collision_tree(struct bidirectional_hash_table* table,
                                        struct bidirectional_hash_table_collision_tree_node** root,
+                                       struct bidirectional_hash_table_collision_tree_node* node,
                                        struct bidirectional_hash_table_key_value_pair* kv_pair,
                                        enum direction dir) {
 
-    struct bidirectional_hash_table_collision_tree_node* new_node = create_collision_tree_node(kv_pair);
+    //struct bidirectional_hash_table_collision_tree_node* new_node = create_collision_tree_node(kv_pair);
 
-    if (new_node == NULL) {
+    if (node == NULL) {
         return false;
     }
 
     if (*root == NULL) {
-        *root = new_node;
+        *root = node;
         return true;
     }
 
@@ -466,7 +533,7 @@ static bool insert_into_collision_tree(struct bidirectional_hash_table* table,
         }
     }
 
-    new_node->parent = parent;
+    node->parent = parent;
     int cmp;
 
     if (dir == FORWARD) {
@@ -476,12 +543,12 @@ static bool insert_into_collision_tree(struct bidirectional_hash_table* table,
     }
 
     if (cmp < 0) {
-        parent->left = new_node;
+        parent->left = node;
     } else {
-        parent->right = new_node;
+        parent->right = node;
     }
 
-    fix_after_insertion(root, new_node);
+    fix_after_insertion(root, node);
     return true;
 }
 
@@ -562,12 +629,15 @@ static bool add_non_existing_key_val_pair(struct bidirectional_hash_table* table
     const size_t key_index = table->hash_function_key(key) % table->capacity;
     const size_t val_index = table->hash_function_val(val) % table->capacity;
 
-    if (!insert_into_collision_tree(table, &table->collision_trees_forward[key_index], new_kv_pair, FORWARD)) {
+    struct bidirectional_hash_table_collision_tree_node* new_node_forward  = create_collision_tree_node(new_kv_pair);
+    struct bidirectional_hash_table_collision_tree_node* new_node_backward = create_collision_tree_node(new_kv_pair);
+
+    if (!insert_into_collision_tree(table, &table->collision_trees_forward[key_index], new_node_forward, new_kv_pair, FORWARD)) {
         free(new_kv_pair);
         return false;
     }
 
-    if (!insert_into_collision_tree(table, &table->collision_trees_backward[val_index], new_kv_pair, BACKWARD)) {
+    if (!insert_into_collision_tree(table, &table->collision_trees_backward[val_index], new_node_backward, new_kv_pair, BACKWARD)) {
         // Rollback the insertion into the forward tree if the backward insertion fails
         struct bidirectional_hash_table_collision_tree_node* node_to_remove = get_node_by_key(table, table->collision_trees_forward[key_index], key);
         struct bidirectional_hash_table_collision_tree_node* removed_node   = delete_from_collision_tree(&table->collision_trees_forward[key_index], node_to_remove);
@@ -589,6 +659,16 @@ it will be replaced with the new mapping.
 bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, void* key, void* val) {
     if (table == NULL || key == NULL || val == NULL) {
         return false;
+    }
+
+    if (need_to_enlarge_table(table)) {
+        size_t new_capacity = table->capacity * 2;
+        
+        rehash_table(table, new_capacity, table->hash_function_key, FORWARD);
+        rehash_table(table, new_capacity, table->hash_function_val, BACKWARD);
+
+        table->capacity      = new_capacity;
+        table->load_capacity = (size_t)(new_capacity * table->load_factor_threshold);
     }
 
     const size_t key_index = table->hash_function_key(key) % table->capacity;
@@ -667,6 +747,16 @@ bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* tab
         return false;
     }
 
+    if (need_to_shrink_table(table)) {
+        size_t new_capacity = table->capacity / 2;
+
+        rehash_table(table, new_capacity, table->hash_function_key, FORWARD);
+        rehash_table(table, new_capacity, table->hash_function_val, BACKWARD);
+
+        table->capacity      = new_capacity;
+        table->load_capacity = (size_t)(new_capacity * table->load_factor_threshold);
+    }
+
     const size_t key_index = table->hash_function_key(key) % table->capacity;
     struct bidirectional_hash_table_collision_tree_node* forward_node = get_node_by_key(table, table->collision_trees_forward[key_index], key);
     
@@ -702,6 +792,16 @@ Removes the key-value pair associated with the specified value from the bidirect
 bool bidirectional_hash_table_remove_by_val(struct bidirectional_hash_table* table, void* val) {
     if (table == NULL || val == NULL) {
         return false;
+    }
+
+    if (need_to_shrink_table(table)) {
+        size_t new_capacity = table->capacity / 2;
+
+        rehash_table(table, new_capacity, table->hash_function_key, FORWARD);
+        rehash_table(table, new_capacity, table->hash_function_val, BACKWARD);
+
+        table->capacity = new_capacity;
+        table->load_capacity = (size_t)(new_capacity * table->load_factor_threshold);
     }
 
     const size_t val_index = table->hash_function_val(val) % table->capacity;
