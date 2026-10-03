@@ -237,6 +237,9 @@ int main(void) {
 
     ASSERT(bidirectional_hash_table_size(table) == num_elements - removed, "Table size incorrect after stress test removals.");
 
+    bidirectional_hash_table_iterator_destroy(it);
+    bidirectional_hash_table_destroy(table);
+
     for (size_t i = 0; i < 1000; ++i) {
         free(arrs[i]);
         free(strs[i]);
