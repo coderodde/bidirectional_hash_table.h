@@ -791,7 +791,7 @@ void* bidirectional_hash_table_find_by_val(struct bidirectional_hash_table* tabl
 The actual implementation of the bidirectional_hash_table_remove_by_key function.
 ********************************************************************************/
 static bool bidirectional_hash_table_remove_by_key_impl(struct bidirectional_hash_table* table, void* key, bool allow_shrink) {
-    if (table == NULL || key == NULL) {
+    if (table == NULL) {
         return false;
     }
 
