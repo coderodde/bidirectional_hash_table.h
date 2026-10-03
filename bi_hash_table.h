@@ -74,6 +74,12 @@ Returns the number of key-value pairs in the bidirectional hash table.
 *********************************************************************/
 size_t bidirectional_hash_table_size(struct bidirectional_hash_table* table);
 
+/***********************************************************************
+Returns the capacity of the bidirectional hash table, i.e. the number of
+buckets in the hash table.
+***********************************************************************/
+size_t bidirectional_hash_table_capacity(struct bidirectional_hash_table* table);
+
 /**********************************************************************
 Returns true if the bidirectional hash table is valid, false otherwise.
 This function is intended for debugging purposes only.

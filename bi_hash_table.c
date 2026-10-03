@@ -376,7 +376,7 @@ static struct bidirectional_hash_table_collision_tree_node* get_node_by_key(
     struct bidirectional_hash_table_collision_tree_node* root, 
     void* key) {
     
-    if (root == NULL || key == NULL) {
+    if (root == NULL) {
         return NULL;
     }
 
@@ -408,7 +408,7 @@ static struct bidirectional_hash_table_collision_tree_node* get_node_by_val(
     struct bidirectional_hash_table_collision_tree_node* root,
     void* val) {
     
-    if (table == NULL || val == NULL) {
+    if (table == NULL) {
         return NULL;
     }
 
@@ -702,7 +702,7 @@ exists, does nothing. If either the key or the value is already present in the t
 it will be replaced with the new mapping.
 ************************************************************************************/
 bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, void* key, void* val) {
-    if (table == NULL || key == NULL || val == NULL) {
+    if (table == NULL) {
         return false;
     }
 
@@ -893,7 +893,7 @@ bool bidirectional_hash_table_remove_by_val(struct bidirectional_hash_table* tab
 Returns true if the bidirectional hash table contains the specified key, false otherwise.
 ****************************************************************************************/
 bool bidirectional_hash_table_contains_key(struct bidirectional_hash_table* table, void* key) {
-    if (table == NULL || key == NULL) {
+    if (table == NULL) {
         return false;
     }
 
@@ -908,7 +908,7 @@ bool bidirectional_hash_table_contains_key(struct bidirectional_hash_table* tabl
 Returns true if the bidirectional hash table contains the specified value, false otherwise.
 ******************************************************************************************/
 bool bidirectional_hash_table_contains_val(struct bidirectional_hash_table* table, void* val) {
-    if (table == NULL || val == NULL) {
+    if (table == NULL) {
         return false;
     }
 
@@ -1129,6 +1129,14 @@ Returns the number of key-value pairs in the bidirectional hash table.
 *********************************************************************/
 size_t bidirectional_hash_table_size(struct bidirectional_hash_table* table) {
     return table->size;
+}
+
+/***********************************************************************
+Returns the capacity of the bidirectional hash table, i.e. the number of
+buckets in the hash table.
+***********************************************************************/
+size_t bidirectional_hash_table_capacity(struct bidirectional_hash_table* table) {
+    return table->capacity;
 }
 
 /**********************************************************************

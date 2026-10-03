@@ -22,12 +22,14 @@ static void REPORT() {
     }
 }
 
-static void ASSERT(bool condition, const char* message) {
+#define ASSERT(condition, message) assert_impl((condition), __LINE__, (message));
+
+static void assert_impl(bool condition, size_t line, const char* message) {
     if (condition) {
         passed_assertions++;
     } else {
         failed_assertions++;
-        fprintf(stderr, "Assertion failed: %s\n", message);
+        fprintf(stderr, "Assertion failed on line %zu: %s\n", line, message);
     }
 }
 
@@ -194,6 +196,46 @@ int main(void) {
 
     bidirectional_hash_table_iterator_destroy(it);
     bidirectional_hash_table_destroy(table);
+
+    table = bidirectional_hash_table_create(
+        10,
+        0.75f,
+        int_ptr_hash,
+        int_ptr_hash,
+        int_ptr_compare,
+        int_ptr_compare);
+
+    const size_t num_elements = 1000;
+
+    for (int i = 0; i < num_elements; ++i) {
+    //    printf("Inserting key-value pair: %d -> %d\n", i, i);
+        ASSERT(bidirectional_hash_table_insert(table, (void*) i, (void*) i), "Failed to insert key-value pair during stress test.");
+    }
+
+    it = bidirectional_hash_table_create_iterator(table);
+
+    size_t removed = 0;
+    size_t line = 0;
+    while (bidirectional_hash_table_iterator_has_next(it)) {
+        //printf("line: %zu, removed: %zu\n", line++, removed);
+        void* key;
+        void* val;
+        ASSERT(bidirectional_hash_table_iterator_next(it, &key, &val), "Iterator failed to get next key-value pair during stress test.");
+        ASSERT(bidirectional_hash_table_contains_key(table, key), "Iterator returned a key not in the table during stress test.");
+        ASSERT(bidirectional_hash_table_contains_val(table, val), "Iterator returned a value not in the table during stress test.");
+
+        if ((int) key % 7 == 0) {
+            ASSERT(bidirectional_hash_table_contains_key(table, key), "Iterator returned a key not in the table during stress test.");
+            ASSERT(bidirectional_hash_table_contains_val(table, val), "Iterator returned a value not in the table during stress test.");
+            ASSERT(bidirectional_hash_table_iterator_remove(it), "Failed to remove key-value pair via iterator during stress test.");
+            ASSERT(!bidirectional_hash_table_contains_key(table, key), "Key should not be found after removal during stress test.");
+            ASSERT(!bidirectional_hash_table_contains_val(table, val), "Value should not be found after removal during stress test.");
+
+            ++removed;
+        }
+    }
+
+    ASSERT(bidirectional_hash_table_size(table) == num_elements - removed, "Table size incorrect after stress test removals.");
 
     for (size_t i = 0; i < 1000; ++i) {
         free(arrs[i]);
