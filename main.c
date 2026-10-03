@@ -156,12 +156,12 @@ int main(void) {
         int_ptr_compare,
         int_ptr_compare);
 
-    it = bidirectional_hash_table_create_iterator(table);
-
     ASSERT(bidirectional_hash_table_insert(table, (void*)1, (void*)1), "Failed to insert key-value pair during iteration.");
     ASSERT(bidirectional_hash_table_insert(table, (void*)2, (void*)2), "Failed to insert key-value pair during iteration.");
     ASSERT(bidirectional_hash_table_insert(table, (void*)3, (void*)3), "Failed to insert key-value pair during iteration.");
     ASSERT(bidirectional_hash_table_insert(table, (void*)4, (void*)4), "Failed to insert key-value pair during iteration.");
+
+    it = bidirectional_hash_table_create_iterator(table);
 
     while (bidirectional_hash_table_iterator_has_next(it)) {
         void* key;
