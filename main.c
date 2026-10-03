@@ -147,6 +147,52 @@ int main(void) {
     ASSERT(bidirectional_hash_table_find_by_val(table, "three") == (void*)3, "Find by value returned incorrect key.");
 
     bidirectional_hash_table_iterator_destroy(it);
+
+    table = bidirectional_hash_table_create(
+        10,
+        0.75f,
+        int_ptr_hash,
+        int_ptr_hash,
+        int_ptr_compare,
+        int_ptr_compare);
+
+    it = bidirectional_hash_table_create_iterator(table);
+
+    ASSERT(bidirectional_hash_table_insert(table, (void*)1, (void*)1), "Failed to insert key-value pair during iteration.");
+    ASSERT(bidirectional_hash_table_insert(table, (void*)2, (void*)2), "Failed to insert key-value pair during iteration.");
+    ASSERT(bidirectional_hash_table_insert(table, (void*)3, (void*)3), "Failed to insert key-value pair during iteration.");
+    ASSERT(bidirectional_hash_table_insert(table, (void*)4, (void*)4), "Failed to insert key-value pair during iteration.");
+
+    while (bidirectional_hash_table_iterator_has_next(it)) {
+        void* key;
+        void* val;
+        ASSERT(bidirectional_hash_table_iterator_next(it, &key, &val), "Iterator failed to get next key-value pair during iteration.");
+        ASSERT(bidirectional_hash_table_contains_key(table, key), "Iterator returned a key not in the table during iteration.");
+        ASSERT(bidirectional_hash_table_contains_val(table, val), "Iterator returned a value not in the table during iteration.");
+
+        if (key == (void*)2 || key == (void*)1 || val == (void*)4) {
+            ASSERT(bidirectional_hash_table_iterator_remove(it), "Failed to remove key-value pair via iterator during iteration.");
+        }
+    }
+
+    bidirectional_hash_table_iterator_destroy(it);
+    it = bidirectional_hash_table_create_iterator(table);
+
+    ASSERT(bidirectional_hash_table_iterator_has_next(it), "Iterator should have next key-value pair.");
+    
+    void* key;
+    void* val;
+
+    ASSERT(bidirectional_hash_table_iterator_next(it, &key, &val), "Iterator failed to get next key-value pair.");
+
+    ASSERT(key == (void*)3, "Iterator returned incorrect key after removals.");
+    ASSERT(val == (void*)3, "Iterator returned incorrect value after removals.");
+    ASSERT(bidirectional_hash_table_iterator_remove(it), "Failed to remove key-value pair via iterator after removals.");
+    ASSERT(!bidirectional_hash_table_iterator_remove(it), "Iterator should not be able to remove again without calling next.");
+    ASSERT(!bidirectional_hash_table_iterator_next(it, &key, &val), "Iterator should not have next key-value pair after removals.");
+    ASSERT(bidirectional_hash_table_is_empty(table), "Table should be empty after all removals.");
+
+    bidirectional_hash_table_iterator_destroy(it);
     bidirectional_hash_table_destroy(table);
 
     for (size_t i = 0; i < 1000; ++i) {
