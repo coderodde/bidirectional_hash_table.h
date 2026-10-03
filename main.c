@@ -13,12 +13,13 @@ static void REPORT() {
     printf("Passed assertions: %zu\n", passed_assertions);
     printf("Failed assertions: %zu\n", failed_assertions);
     printf("Total assertions:  %zu\n", passed_assertions + failed_assertions);
-    printf("Success rate:     %.2f%%\n", (double)passed_assertions / (passed_assertions + failed_assertions) * 100.0);
+    printf("Success rate:      %.2f%%\n", (double)passed_assertions / (passed_assertions + failed_assertions) * 100.0);
 
     if (failed_assertions > 0) {
         exit(EXIT_FAILURE);
     } else {
         puts("[STATUS] All tests passed.");
+        exit(EXIT_SUCCESS);
     }
 }
 
@@ -149,6 +150,7 @@ int main(void) {
     ASSERT(bidirectional_hash_table_find_by_val(table, "three") == (void*)3, "Find by value returned incorrect key.");
 
     bidirectional_hash_table_iterator_destroy(it);
+    bidirectional_hash_table_destroy(table);
 
     table = bidirectional_hash_table_create(
         10,
@@ -244,9 +246,6 @@ int main(void) {
         free(arrs[i]);
         free(strs[i]);
     }
-
-    bidirectional_hash_table_iterator_destroy(it);
-    bidirectional_hash_table_destroy(table);
 
     free(arrs);
     free(strs);
