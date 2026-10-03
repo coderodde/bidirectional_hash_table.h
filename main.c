@@ -6,6 +6,31 @@
 #include <string.h>
 #include <time.h>
 
+static size_t passed_assertions = 0;
+static size_t failed_assertions = 0;
+
+static void REPORT() {
+    printf("Passed assertions: %zu\n", passed_assertions);
+    printf("Failed assertions: %zu\n", failed_assertions);
+    printf("Total assertions:  %zu\n", passed_assertions + failed_assertions);
+    printf("Success rate:     %.2f%%\n", (double)passed_assertions / (passed_assertions + failed_assertions) * 100.0);
+
+    if (failed_assertions > 0) {
+        exit(EXIT_FAILURE);
+    } else {
+        puts("[STATUS] All tests passed.");
+    }
+}
+
+static void ASSERT(bool condition, const char* message) {
+    if (condition) {
+        passed_assertions++;
+    } else {
+        failed_assertions++;
+        fprintf(stderr, "Assertion failed: %s\n", message);
+    }
+}
+
 size_t int_ptr_hash(void* ptr) {
     return (size_t)(uintptr_t) ptr % 30;
 }
@@ -64,37 +89,26 @@ int main(void) {
 
     for (size_t i = 0; i < 1000; ++i) {
         bidirectional_hash_table_insert(table, arrs[i], strs[i]);
-
-        if (!bidirectional_hash_table_check_invariants(table)) {
-            printf("Invariants check failed after insertion of key-value pair %zu\n", i);
-            return 1;
-        }
+        ASSERT(bidirectional_hash_table_contains_key(table, arrs[i]), "Key not found after insertion.");
+        ASSERT(bidirectional_hash_table_contains_val(table, strs[i]), "Value not found after insertion.");
+        ASSERT(bidirectional_hash_table_find_by_key(table, arrs[i]) == strs[i], "Find by key returned incorrect value.");
+        ASSERT(bidirectional_hash_table_find_by_val(table, strs[i]) == arrs[i], "Find by value returned incorrect key.");
+        ASSERT(bidirectional_hash_table_check_invariants(table), "Invariants check failed after insertion.");
     }
 
     for (size_t i = 0; i < 1000; ++i) {
         if (!bidirectional_hash_table_contains_key(table, arrs[i])) {
-            printf("Key not found after insertion: %zu\n", i);
-            return 1;
+            ASSERT(bidirectional_hash_table_contains_key(table, arrs[i]), "Key not found after insertion.");
         }
 
         if (!bidirectional_hash_table_contains_val(table, strs[i])) {
-            printf("Value not found after insertion: %zu\n", i);
-            return 1;
+            ASSERT(bidirectional_hash_table_contains_val(table, strs[i]), "Value not found after insertion.");
         }
     }
 
-    printf("Table variant OK: %d\n", bidirectional_hash_table_check_invariants(table));
-
     for (size_t i = 0; i < 500; ++i) {
-        if (!bidirectional_hash_table_remove_by_key(table, arrs[i])) {
-            printf("Failed to remove key: %zu\n", i);
-            return 1;
-        }
-
-        if (!bidirectional_hash_table_check_invariants(table)) {
-            printf("Invariants check failed after removal of key-value pair %zu\n", i);
-            return 1;
-        }
+        ASSERT(bidirectional_hash_table_remove_by_key(table, arrs[i]), "Failed to remove key-value pair.");
+        ASSERT(bidirectional_hash_table_check_invariants(table), "Invariants check failed after removal of key-value pair.");
     }
 
     struct bidirectional_hash_table_key_value_pair_iterator* it = bidirectional_hash_table_create_iterator(table);
@@ -103,99 +117,34 @@ int main(void) {
         void* key;
         void* val;
 
-        if (!bidirectional_hash_table_iterator_next(it, &key, &val)) {
-            printf("Iterator failed to get next key-value pair\n");
-            return 1;
-        }
-
-        if (!bidirectional_hash_table_contains_key(table, key)) {
-            printf("Iterator returned a key not in the table\n");
-            return 1;
-        }
-
-        if (!bidirectional_hash_table_contains_val(table, val)) {
-            printf("Iterator returned a value not in the table\n");
-            return 1;
-        }
-
-        bidirectional_hash_table_iterator_remove(it);
+        ASSERT(bidirectional_hash_table_iterator_next(it, &key, &val), "Iterator failed to get next key-value pair");
+        ASSERT(bidirectional_hash_table_contains_key(table, key), "Iterator returned a key not in the table.");
+        ASSERT(bidirectional_hash_table_contains_val(table, val), "Iterator returned a value not in the table.");
+        ASSERT(bidirectional_hash_table_iterator_remove(it), "Failed to remove key-value pair via iterator.");
     }
 
-    if (!bidirectional_hash_table_is_empty(table)) {
-        printf("Table is NOT empty after iterator removals.\n");
-        return 1;
-    }
+    ASSERT(bidirectional_hash_table_is_empty(table), "Table is not empty after iterator removals.");
 
-    bidirectional_hash_table_insert(table, (void*) 2, "two");
+    ASSERT(bidirectional_hash_table_insert(table, (void*) 2, "two"), "Failed to insert key-value pair.");
     
-    if (!bidirectional_hash_table_contains_key(table, (void*) 2)) {
-        puts("[ERROR] !bidirectional_hash_table_contains_by_key(table, 2)");
-        return 1;
-    }
-        
-    if (!bidirectional_hash_table_contains_val(table, (void*) "two")) {
-        puts("[ERROR] !bidirectional_hash_table_contains_by_val(table, \"two\")");
-        return 1;
-    }
+    ASSERT(bidirectional_hash_table_contains_key(table, (void*) 2), "Key not found after insertion.");
+    ASSERT(bidirectional_hash_table_contains_val(table, "two"), "Value not found after insertion.");
+    ASSERT(bidirectional_hash_table_find_by_key(table, (void*)2) == "two", "Find by key returned incorrect value.");
+    ASSERT(bidirectional_hash_table_find_by_val(table, "two") == (void*)2, "Find by value returned incorrect key.");
     
-    if ((void*) 2 != bidirectional_hash_table_find_by_val(table, "two")) {
-        puts("[ERROR] 2 != bidirectional_hash_table_find_by_val(table, \"two\")");
-        return 1;
-    }
-    
-    if (strcmp("two", bidirectional_hash_table_find_by_key(table, (void*) 2)) != 0) {
-        puts("[ERROR] strcmp(\"two\", bidirectional_hash_table_find_by_key(table, 2)) != 0");
-        return 1;
-    }
-    
-    bidirectional_hash_table_insert(table, (void*) 2, "three");
+    ASSERT(bidirectional_hash_table_insert(table, (void*)2, "three"), "Failed to update value for existing key.");
 
-    if (!bidirectional_hash_table_contains_key(table, (void*) 2)) {
-        puts("[ERROR] !bidirectional_hash_table_contains_by_key(table, 2)");
-        return 1;
-    }
-        
-    if (!bidirectional_hash_table_contains_val(table, "three")) {
-        puts("[ERROR] !bidirectional_hash_table_contains_by_val(table, \"three\")");
-        return 1;
-    }
+    ASSERT(bidirectional_hash_table_contains_key(table, (void*)2), "Key not found after updating value.");
+    ASSERT(bidirectional_hash_table_contains_val(table, "three"), "Updated value not found after insertion.");
+    ASSERT(bidirectional_hash_table_find_by_key(table, (void*)2) == "three", "Find by key returned incorrect updated value.");
+    ASSERT(bidirectional_hash_table_find_by_val(table, "three") == (void*)2, "Find by value returned incorrect key for updated value.");
     
-    if (bidirectional_hash_table_contains_val(table, "two")) {
-        puts("[ERROR] bidirectional_hash_table_contains_by_val(table, \"two\")");
-        return 1;
-    }
-    
-    if ((void*) 2 != bidirectional_hash_table_find_by_val(table, "three")) {
-        puts("[ERROR] 2 != bidirectional_hash_table_find_by_val(table, \"three\")");
-        return 1;
-    }
-    
-    if (strcmp("three", bidirectional_hash_table_find_by_key(table, (void*) 2)) != 0) {
-        puts("[ERROR] strcmp(\"three\", bidirectional_hash_table_find_by_key(table, 2)) != 0");
-        return 1;
-    }
-    
-    bidirectional_hash_table_insert(table, (void*) 3, "three");
-    
-    if (!bidirectional_hash_table_contains_key(table, (void*) 3)) {
-        puts("[ERROR] !bidirectional_hash_table_contains_by_key(table, 3)");
-        return 1;
-    }
-        
-    if (!bidirectional_hash_table_contains_val(table, "three")) {
-        puts("[ERROR] !bidirectional_hash_table_contains_by_val(table, \"three\")");
-        return 1;
-    }
-    
-    if ((void*) 3 != bidirectional_hash_table_find_by_val(table, "three")) {
-        puts("[ERROR] 3 != bidirectional_hash_table_find_by_val(table, \"three\")");
-        return 1;
-    }
-    
-    if (strcmp("three", bidirectional_hash_table_find_by_key(table, (void*) 3)) != 0) {
-        puts("[ERROR] strcmp(\"three\", bidirectional_hash_table_find_by_key(table, 3)) != 0");
-        return 1;
-    }
+    ASSERT(bidirectional_hash_table_insert(table, (void*) 3, "three"), "Failed to insert key-value pair.");
+
+    ASSERT(bidirectional_hash_table_contains_key(table, (void*)3), "Key not found after insertion.");
+    ASSERT(bidirectional_hash_table_contains_val(table, "three"), "Value not found after insertion.");
+    ASSERT(bidirectional_hash_table_find_by_key(table, (void*)3) == "three", "Find by key returned incorrect value.");
+    ASSERT(bidirectional_hash_table_find_by_val(table, "three") == (void*)3, "Find by value returned incorrect key.");
 
     bidirectional_hash_table_iterator_destroy(it);
     bidirectional_hash_table_destroy(table);
@@ -208,7 +157,7 @@ int main(void) {
     free(arrs);
     free(strs);
 
-    puts("[STATUS] All tests passed.");
+    REPORT();
 
-    return 0;
+    return EXIT_SUCCESS;
 }
