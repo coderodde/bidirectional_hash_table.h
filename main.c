@@ -198,7 +198,7 @@ int main(void) {
     }
     
     bidirectional_hash_table_destroy(table);
-    free(it);
+    bidirectional_hash_table_iterator_destroy(it);
 
     for (size_t i = 0; i < 1000; ++i) {
         free(arrs[i]);

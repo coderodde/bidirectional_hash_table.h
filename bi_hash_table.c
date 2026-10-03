@@ -717,7 +717,7 @@ bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, voi
     }
 
     const size_t key_index = table->hash_function_key(key) % table->capacity;
-    const size_t val_index = table->hash_function_val(val) % table->capacity;
+          size_t val_index = table->hash_function_val(val) % table->capacity;
 
     struct bidirectional_hash_table_collision_tree_node* existing_key_node = get_node_by_key(table, table->collision_trees_forward [key_index], key);
     struct bidirectional_hash_table_collision_tree_node* existing_val_node = get_node_by_val(table, table->collision_trees_backward[val_index], val);
@@ -734,6 +734,9 @@ bool bidirectional_hash_table_insert(struct bidirectional_hash_table* table, voi
             return false;
         }
     }
+
+    // We might have 
+    val_index = table->hash_function_val(val) % table->capacity;
 
     existing_val_node = get_node_by_val(table, table->collision_trees_backward[val_index], val);
 
@@ -784,15 +787,15 @@ void* bidirectional_hash_table_find_by_val(struct bidirectional_hash_table* tabl
     return NULL;
 }
 
-/**********************************************************************************************
-Removes the key-value pair associated with the specified key from the bidirectional hash table.
-**********************************************************************************************/
-bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* table, void* key) {
+/********************************************************************************
+The actual implementation of the bidirectional_hash_table_remove_by_key function.
+********************************************************************************/
+static bool bidirectional_hash_table_remove_by_key_impl(struct bidirectional_hash_table* table, void* key, bool allow_shrink) {
     if (table == NULL || key == NULL) {
         return false;
     }
 
-    if (need_to_shrink_table(table)) {
+    if (need_to_shrink_table(table) && allow_shrink) {
         size_t new_capacity = table->capacity / 2;
 
         rehash_table(table, new_capacity, table->hash_function_key, FORWARD);
@@ -804,7 +807,7 @@ bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* tab
 
     const size_t key_index = table->hash_function_key(key) % table->capacity;
     struct bidirectional_hash_table_collision_tree_node* forward_node = get_node_by_key(table, table->collision_trees_forward[key_index], key);
-    
+
     if (forward_node == NULL) {
         return false;
     }
@@ -812,23 +815,30 @@ bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* tab
     struct bidirectional_hash_table_key_value_pair* kv_pair = forward_node->key_value_pair;
     void* val = kv_pair->val;
     const size_t val_index = table->hash_function_val(val) % table->capacity;
-
-    struct bidirectional_hash_table_collision_tree_node* backward_node = 
-    get_node_by_val(table,
-                    table->collision_trees_backward[val_index],
-                    val);
-
+   
+    struct bidirectional_hash_table_collision_tree_node* backward_node =
+        get_node_by_val(table,
+            table->collision_trees_backward[val_index],
+            val);
+    
     // Remove the node from both collision trees
-    struct bidirectional_hash_table_collision_tree_node* removed_forward_node  = delete_from_collision_tree(&table->collision_trees_forward [key_index], forward_node);
+    struct bidirectional_hash_table_collision_tree_node* removed_forward_node  = delete_from_collision_tree(&table->collision_trees_forward[key_index], forward_node);
     struct bidirectional_hash_table_collision_tree_node* removed_backward_node = delete_from_collision_tree(&table->collision_trees_backward[val_index], backward_node);
-
+    
     // Free the key-value pair
     free(kv_pair);
     free(removed_forward_node);
     free(removed_backward_node);
-
+    
     table->size--;
     return true;
+}
+
+/**********************************************************************************************
+Removes the key-value pair associated with the specified key from the bidirectional hash table.
+**********************************************************************************************/
+bool bidirectional_hash_table_remove_by_key(struct bidirectional_hash_table* table, void* key) {
+    return bidirectional_hash_table_remove_by_key_impl(table, key, true);
 }
 
 /************************************************************************************************
@@ -1002,26 +1012,35 @@ bool bidirectional_hash_table_iterator_next(struct bidirectional_hash_table_key_
 Removes the most recent key/value pair from the table.
 *****************************************************/
 bool bidirectional_hash_table_iterator_remove(struct bidirectional_hash_table_key_value_pair_iterator* iterator) {
-    if (iterator->current_tree_node == NULL) {
+    if (iterator == NULL || iterator->current_tree_node == NULL) {
         return false;
     }
 
-    struct bidirectional_hash_table_collision_tree_node* current = iterator->current_tree_node;
+    void* key      = iterator->current_tree_node->key_value_pair->key;
+    void* next_key = iterator->next_tree_node == NULL
+                   ? NULL
+                   : iterator->next_tree_node->key_value_pair->key;
 
-    bool has_two_children = current->left != NULL && current->right != NULL;
-
-    void* key = current->key_value_pair->key;
-
-    if (!bidirectional_hash_table_remove_by_key(iterator->table, key)) {
+    if (!bidirectional_hash_table_remove_by_key_impl(iterator->table, key, false)) {
         return false;
-    }
-
-    if (has_two_children) {
-        iterator->next_tree_node = current;
     }
 
     iterator->current_tree_node = NULL;
-    return true;
+
+    if (next_key == NULL) {
+        iterator->next_tree_node = NULL;
+        return true;
+    }
+
+    const size_t next_index = iterator->table->hash_function_key(next_key)
+                            % iterator->table->capacity;
+
+    iterator->table_socket_index = next_index;
+    iterator->next_tree_node = get_node_by_key(iterator->table, 
+                                               iterator->table->collision_trees_forward[next_index],
+                                               next_key);
+
+    return iterator->next_tree_node != NULL;
 }
 
 /******************************************************************************
@@ -1030,6 +1049,20 @@ Frees the iterator and all associated resources. Does not touch the hash table.
 void bidirectional_hash_table_iterator_destroy(struct bidirectional_hash_table_key_value_pair_iterator* iterator) {
     if (iterator == NULL) {
         return;
+    }
+
+    if (need_to_shrink_table(iterator->table)) {
+        size_t new_capacity = iterator->table->capacity / 2;
+
+        while (new_capacity >= 2 * MINIMUM_CAPACITY && iterator->table->size < (size_t)(new_capacity * iterator->table->load_factor_threshold)) {
+            new_capacity /= 2;
+        }
+
+        rehash_table(iterator->table, new_capacity, iterator->table->hash_function_key, FORWARD);
+        rehash_table(iterator->table, new_capacity, iterator->table->hash_function_val, BACKWARD);
+
+        iterator->table->capacity = new_capacity;
+        iterator->table->load_capacity = (size_t)(new_capacity * iterator->table->load_factor_threshold);
     }
 
     free(iterator);
