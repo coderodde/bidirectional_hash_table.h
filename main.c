@@ -196,9 +196,9 @@ int main(void) {
         puts("[ERROR] strcmp(\"three\", bidirectional_hash_table_find_by_key(table, 3)) != 0");
         return 1;
     }
-    
-    bidirectional_hash_table_destroy(table);
+
     bidirectional_hash_table_iterator_destroy(it);
+    bidirectional_hash_table_destroy(table);
 
     for (size_t i = 0; i < 1000; ++i) {
         free(arrs[i]);
